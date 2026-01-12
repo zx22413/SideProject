@@ -13,8 +13,11 @@
 > **參考來源**：[[企劃書與Bird Alone結合探討]]、[[數位印記日記App設計]]  
 > **前版本文檔**：[[MVP 企劃：7日陪伴實驗_V1.3]]
 
-**狀態**：🟡 規劃中  
+**狀態**：🟢 執行中  
 **標籤**： #MVP #實驗 #SideProject #V1_4 #BirdAlone #非AI #狀態機 #外部網頁
+
+> [!success] 技術底層已打通
+> **2026-01-12 更新**：LINE Messaging API + Google Apps Script + Google Sheets 三端連線成功，用戶狀態初始化邏輯完成。詳見 [[2026-01-12_Cloudy開發紀錄]]。
 
 ---
 
@@ -321,26 +324,34 @@ const userState = {
 
 ## 5. 技術架構 (Technical Architecture)
 
+> [!info] 實作狀態
+> **2026-01-12 更新**：技術底層（LINE + GAS + Sheets）已打通 ✅  
+> 詳見 [[2026-01-12_Cloudy開發紀錄]]
+
 ### 前端架構
 
 **LINE OA（遊戲大廳）**：
-- 圖文選單（3 個按鈕：餵食、聊天、查看狀態）
-- 關鍵字自動回應（根據通關密語匹配預設對話）
-- 推播通知（每天定時推播）
+- ✅ LINE Messaging API 串接完成
+- ✅ Webhook 接收與回覆機制實作完成
+- [ ] 圖文選單（3 個按鈕：餵食、聊天、查看狀態）
+- [ ] 關鍵字自動回應（根據通關密語匹配預設對話）
+- [ ] 推播通知（每天定時推播）
 
 **外部網頁（視覺呈現）**：
-- HTML + CSS + JavaScript
-- 根據 URL 參數（`?day=1&mood=happy&tags=拌拌派`）動態更新
-- 資料儲存：localStorage（簡單版）或 Firebase（跨裝置同步）
+- [ ] HTML + CSS + JavaScript（使用 GAS HtmlService）
+- [ ] 根據 URL 參數（`?day=1&mood=happy&tags=拌拌派`）動態更新
+- ✅ 資料儲存：Google Sheets（已實作）
 
-### 後端架構（可選）
+### 後端架構
 
-**如果不需要跨裝置同步**：
-- 完全前端，用 localStorage
-
-**如果需要跨裝置同步**：
-- Firebase / Supabase（簡單的資料庫）
-- 記錄用戶的選擇和情緒
+**Google Apps Script (GAS) + Google Sheets**：
+- ✅ GAS 權限授權完成
+- ✅ SpreadsheetApp 連線成功
+- ✅ 用戶狀態讀寫邏輯實作完成
+- ✅ 試算表結構定義完成（userId, day, currentMood, tags, lastInteraction）
+- [ ] 對話庫系統（dialogueLibrary 物件）
+- [ ] 狀態機邏輯（day 計數器自動更新）
+- [ ] 記憶系統（標籤提取與觸發）
 
 ### 對話庫管理
 
@@ -406,11 +417,12 @@ const userState = {
   - 每個情境準備 10-15 種變體
   - 總字數約 3,000-5,000 字
 
-#### [ ] 設計狀態機邏輯
+#### [x] 設計狀態機邏輯 ✅ **2026-01-12 完成**
 - **任務描述**：
-  - 定義核心變量（day, mood, tags, timeOfDay）
-  - 設計匹配邏輯（如何根據狀態選擇對話）
-  - 設計記憶系統（如何提取和觸發記憶）
+  - ✅ 定義核心變量（day, mood, tags, timeOfDay）
+  - ✅ 試算表結構設計完成
+  - [ ] 設計匹配邏輯（如何根據狀態選擇對話）
+  - [ ] 設計記憶系統（如何提取和觸發記憶）
 
 #### [ ] 設計外部網頁
 - **任務描述**：
@@ -420,16 +432,28 @@ const userState = {
 
 ### Phase 1: 建置 (預計 1-2 週)
 
+- [x] **技術底層打通** ✅ **2026-01-12 完成**
+  - ✅ LINE Messaging API 串接完成
+  - ✅ Google Apps Script 權限授權完成
+  - ✅ Google Sheets 資料庫架構建立完成
+  - ✅ 用戶狀態初始化邏輯實作完成
+  - 詳見 [[2026-01-12_Cloudy開發紀錄]]
+
 - [ ] **LINE OA 設定**：
-  - 設定圖文選單（3 個按鈕）
-  - 設定關鍵字自動回應（根據通關密語匹配預設對話）
-  - 設定推播通知（3 天的推播文案）
+  - [ ] 設定圖文選單（3 個按鈕）
+  - [ ] 設定關鍵字自動回應（根據通關密語匹配預設對話）
+  - [ ] 設定推播通知（3 天的推播文案）
+
+- [ ] **對話庫系統實作**：
+  - [ ] 在 GAS 中建立 dialogueLibrary 物件
+  - [ ] 實作隨機選取對話邏輯
+  - [ ] 實作標籤系統（tags 欄位讀寫）
 
 - [ ] **外部網頁開發**：
-  - 實作 HTML + CSS + JavaScript
-  - 實作狀態機邏輯
-  - 實作對話庫匹配系統
-  - 測試所有功能是否正常運作
+  - [ ] 實作 HTML + CSS + JavaScript（使用 GAS HtmlService）
+  - [ ] 實作狀態機邏輯
+  - [ ] 實作對話庫匹配系統
+  - [ ] 測試所有功能是否正常運作
 
 ### Phase 2: 封測 (Wizard of Oz)
 
@@ -548,6 +572,6 @@ const userState = {
 
 ---
 
-**狀態**：🟡 規劃中  
+**狀態**：🟢 執行中  
 **版本**：V1.4  
-**最後更新**：2025-01-XX
+**最後更新**：2026-01-12
