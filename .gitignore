@@ -1,18 +1,24 @@
-﻿# Obsidian 閮剖?
+﻿# Obsidian settings
 /.obsidian/workspace.json
 
-# ??鞈?嚗???LINE Token?oogle Sheets ID嚗?01-?撖阡?/蝔?蝣?*.gs
-01-?撖阡?/蝔?蝣?*.csv
-!01-?撖阡?/蝔?蝣?*.template.gs
+# Sensitive files (LINE Token, Google Sheets ID)
+01-*/*/程式碼/*.gs
+01-*/*/程式碼/*.csv
+!01-*/*/程式碼/*.template.gs
 
-# ?啣?霈
+# Alternative pattern (if above doesn't work)
+**/*程式碼/*.gs
+**/*程式碼/*.csv
+!**/*程式碼/*.template.gs
+
+# Environment variables
 .env
 .env.local
 
-# 蝟餌絞瑼?
+# System files
 .DS_Store
 Thumbs.db
 
-# ?冽??辣
+# Temporary files
 *.tmp
 *.log
