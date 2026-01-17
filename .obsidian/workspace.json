@@ -1,0 +1,234 @@
+{
+  "main": {
+    "id": "69759a9c051291ad",
+    "type": "split",
+    "children": [
+      {
+        "id": "b6c51f76d4495e96",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "bf2a356d9c738432",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "00-工作區/重構完成報告_2026-01-17.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "重構完成報告_2026-01-17"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "bdccb53850a039e5",
+    "type": "split",
+    "children": [
+      {
+        "id": "7fe1b4a40339fd5e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6db646744f66782a",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": true
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "60660665807159ec",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": true,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "de75fe234e9604ee",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 336.5
+  },
+  "right": {
+    "id": "171b610a1e209d6c",
+    "type": "split",
+    "children": [
+      {
+        "id": "086ed5502e261c2c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "1f5196e21fce306c",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "00-工作區/重構完成報告_2026-01-17.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for 重構完成報告_2026-01-17"
+            }
+          },
+          {
+            "id": "f26a2b2463363809",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "人肉推播.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from 人肉推播"
+            }
+          },
+          {
+            "id": "b3ccdebb2dbb0a3c",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "9050471da4e3532a",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "961a0f0e26550cb4",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "人肉推播.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of 人肉推播"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "bf2a356d9c738432",
+  "lastOpenFiles": [
+    "02-劇本設計/靈魂考古_3日邏輯鏈.md",
+    "00-工作區/主 Backlog_2026-01-15.md",
+    "00-工作區/待辦事項-問卷更新.md",
+    "00-核心企劃/開發決策鏈.md",
+    "00-核心企劃/歷史歸檔_V1.0-V1.3/README.md",
+    "00-核心企劃/當前專案_靈魂食堂/靈魂食堂企劃：料理與救贖.md",
+    "04-資源素材/開發哲學_成本優先原則.md",
+    "技術成本_LINE推播費用分析.md",
+    "敘事機制_腳本與AI的平衡.md",
+    "00-核心企劃/當前專案_靈魂食堂/靈魂食堂：最終開發執行企劃書.md",
+    "00-工作區/Side Project 雜記.md",
+    "00-工作區/專案整理完成報告_2026-01-17.md",
+    "00-工作區/重構完成報告_2026-01-17.md",
+    "00-工作區/架構診斷報告_2026-01-15.md",
+    "01-開發實驗/2026-01-12_Cloudy開發紀錄.md",
+    "01-開發實驗/程式碼/敏感文件同步指南.md",
+    "02-研究分析/靈魂食堂企劃重構.md",
+    "00-核心企劃/當前專案_靈魂食堂/README.md",
+    "test.gs",
+    "01-開發實驗/程式碼.7z",
+    "01-開發實驗/程式碼.7z.tmp",
+    "01-開發實驗/程式碼/config.template.gs",
+    "02-研究分析/黃昏旅店分析計畫.md",
+    "02-研究分析/紅弦俱樂部劇情攻略與分析.md",
+    "01-開發實驗/程式碼/重構驗證報告_2026-01-16.md",
+    "01-開發實驗/程式碼/程式碼.gs",
+    "00-工作區/待辦事項-優化每日推播.md",
+    "01-開發實驗/程式碼/README.md",
+    "README.md",
+    "01-開發實驗/專案實作對照表.md",
+    "02-劇本設計/【操作指南】如何將劇本複製到Google Sheets.md",
+    "01-開發實驗/程式碼/程式碼_GAS相容版.gs",
+    "commit_msg.txt",
+    "00-工作區/手動移動清單.txt",
+    "00-核心企劃/當前專案_靈魂食堂",
+    "00-核心企劃/歷史歸檔_V1.0-V1.3",
+    "04-資源素材/圖片/雲寶/BabyCloud.jpg",
+    "04-資源素材/圖片/雲寶/StandardCloudSad.png",
+    "04-資源素材/圖片/雲寶/StandardCloudHappy.png",
+    "04-資源素材/圖片/雲寶/StandardCloud.png",
+    "04-資源素材/圖片/雲寶/StandardCloudAngary.jpg",
+    "04-資源素材/圖片/雲寶/RainbowHaloCloud.jpg",
+    "04-資源素材/圖片/Pasted image 20251231005215.png",
+    "04-資源素材/圖片/Pasted image 20251231005035.png",
+    "04-資源素材/圖片/finch營收下載.png",
+    "04-資源素材/圖片/finch goole play評論.png"
+  ]
+}
