@@ -1,2 +1,24 @@
+﻿# Obsidian settings
 /.obsidian/workspace.json
 
+# Sensitive files (LINE Token, Google Sheets ID)
+01-*/*/程式碼/*.gs
+01-*/*/程式碼/*.csv
+!01-*/*/程式碼/*.template.gs
+
+# Alternative pattern (if above doesn't work)
+**/*程式碼/*.gs
+**/*程式碼/*.csv
+!**/*程式碼/*.template.gs
+
+# Environment variables
+.env
+.env.local
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
