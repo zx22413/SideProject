@@ -1,4 +1,4 @@
-# 🚀 MVP 企劃：7日陪伴實驗 (Project Oasis)
+﻿# 🚀 MVP 企劃：7日陪伴實驗 (Project Oasis)
 
 > [!abstract] 核心提問
 > **人會不會因為一個『知道我真實狀態』的虛擬存在，而願意持續回來？**
