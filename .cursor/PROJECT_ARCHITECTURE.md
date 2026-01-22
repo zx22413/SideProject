@@ -484,7 +484,269 @@ graph TD
 
 ---
 
-**文件狀態**：✅ 完整版  
+## 🤖 Cursor AI 配置指南
+
+### `.cursor` 資料夾說明
+
+**定義**：Cursor 的專案級配置目錄，用於存放 AI 行為設定、規則和技能。
+
+#### 目錄結構
+
+```
+.cursor/
+├── rules/              # AI 行為規則（.mdc 檔案）
+├── skills/             # Agent Skills（專案級）
+│   └── obsidian-skills/  # ✅ 已安裝
+│       ├── obsidian-markdown/
+│       ├── obsidian-bases/
+│       └── json-canvas/
+└── PROJECT_ARCHITECTURE.md  # 本文件（架構總覽）
+```
+
+---
+
+### 📋 Rules vs Skills 差異
+
+| 特性 | Rules | Skills |
+|------|-------|--------|
+| **用途** | 定義 AI 行為規範 | 提供可執行的工作流程 |
+| **格式** | `.mdc` (Markdown) | `SKILL.md` + 可選腳本 |
+| **觸發方式** | Always / Auto / Manual | Agent 主動選擇或用戶調用 |
+| **範例** | "永遠使用 Obsidian 連結格式" | "執行文件整理流程" |
+
+---
+
+### 🎯 規則（Rules）配置
+
+#### 規則類型
+
+1. **Always**：自動包含在所有 AI 對話中
+2. **Auto Attached**：當檔案符合特定 glob pattern 時自動包含
+3. **Agent Requested**：AI 可自行選擇是否使用（需要描述）
+4. **Manual**：需明確用 `@ruleName` 調用
+
+#### 建議建立的規則
+
+```
+.cursor/rules/
+├── obsidian-linking.mdc          # Obsidian 連結規範（Always）
+├── work-journal-format.mdc       # 工作日記格式（Auto Attached: 00-工作區/*.md）
+└── commit-message-standard.mdc   # Commit Message 標準（Agent Requested）
+```
+
+---
+
+### 🛠️ 技能（Skills）配置
+
+#### 已安裝的 Skills
+
+**Obsidian Skills**（by kepano）
+- ✅ 安裝位置：`.cursor/skills/obsidian-skills/`
+- 📦 安裝方式：
+  ```bash
+  cd .cursor/skills
+  git clone https://github.com/kepano/obsidian-skills.git obsidian-skills
+  ```
+- ⚠️ **注意**：此目錄已加入 `.gitignore`（外部依賴，不推送至 Git）
+- **功能**：
+  - `obsidian-markdown`：建立和編輯 Obsidian Flavored Markdown
+  - `obsidian-bases`：處理 Obsidian Bases (`.base` 檔案)
+  - `json-canvas`：處理 JSON Canvas (`.canvas` 檔案)
+- **用途**：確保 AI 正確處理 Obsidian 的雙向連結 `[[連結]]` 格式
+
+#### 建議開發的自訂 Skills
+
+基於本專案的工作流程，建議開發以下 Skills：
+
+##### 1. `daily-journal-sync` Skill
+```
+.cursor/skills/daily-journal-sync/
+├── SKILL.md
+└── README.md
+```
+**功能**：
+- 讀取當日工作報告
+- 自動更新相關 Tier 1 文件（企劃書、Backlog、專案實作對照表）
+- 檢查並更新雙向連結
+- 建議可歸檔的舊報告
+
+**觸發時機**：
+- 完成工作報告後
+- 用戶使用 `/sync-journal` 命令
+
+##### 2. `project-cleanup` Skill
+```
+.cursor/skills/project-cleanup/
+├── SKILL.md
+└── README.md
+```
+**功能**：
+- 掃描專案文件，識別低價值/重複/空白文件
+- 檢測空連結和孤立文件
+- 生成整理建議報告
+- 執行檔案移動/刪除（需用戶確認）
+
+**觸發時機**：
+- 定期維護（每週/每月）
+- Obsidian Graph 變得混亂時
+
+##### 3. `archive-detector` Skill
+```
+.cursor/skills/archive-detector/
+├── SKILL.md
+└── README.md
+```
+**功能**：
+- 自動檢測超過 7 天的工作報告
+- 識別 V1.0-V1.3 時代的舊文件
+- 建議歸檔路徑
+- 更新所有引用該文件的連結
+
+**觸發時機**：
+- 每次新增工作報告時
+- 用戶使用 `/check-archive` 命令
+
+##### 4. `obsidian-link-validator` Skill
+```
+.cursor/skills/obsidian-link-validator/
+├── SKILL.md
+└── README.md
+```
+**功能**：
+- 掃描所有 Markdown 文件的 `[[連結]]`
+- 檢測空連結（目標不存在）
+- 檢測重複連結
+- 生成修復建議
+
+**觸發時機**：
+- 文件整理後
+- Commit 前檢查
+
+---
+
+### 🌐 外部資源與安裝
+
+#### Agent Skills 資源庫
+
+1. **官方標準庫**
+   - [Agent Skills 官網](https://agentskills.io)
+   - 超過 63,000+ 技能可參考
+
+2. **社群資源**
+   - [Awesome Claude Skills](https://github.com/VoltAgent/awesome-claude-skills)（3.7k stars）
+   - [Ultimate Agent Skills Collection](https://github.com/ZhanlinCui/Ultimate-Agent-Skills-Collection)（40+ 高品質技能）
+
+3. **Obsidian 專用**
+   - [Obsidian Skills by kepano](https://github.com/kepano/obsidian-skills)（✅ 已安裝）
+
+#### 全域 vs 專案級安裝
+
+```bash
+# 專案級（只在此專案使用）
+.cursor/skills/          # ✅ 當前使用
+
+# 全域級（所有專案使用）
+~/.cursor/skills/        # 適合通用技能
+```
+
+---
+
+### 📝 Skill 開發格式
+
+#### 標準 `SKILL.md` 結構
+
+```markdown
+---
+description: 一行描述這個技能做什麼
+tags: [tag1, tag2]
+version: 1.0.0
+---
+
+# Skill Name
+
+## Description
+詳細說明這個技能的功能和使用場景。
+
+## When to Use
+- 觸發條件 1
+- 觸發條件 2
+- 觸發條件 3
+
+## How It Works
+1. 步驟 1：做什麼
+2. 步驟 2：做什麼
+3. 步驟 3：做什麼
+
+## Examples
+
+### Example 1: 場景名稱
+\`\`\`
+範例代碼或操作
+\`\`\`
+
+### Example 2: 場景名稱
+\`\`\`
+範例代碼或操作
+\`\`\`
+
+## Dependencies
+- 必須的檔案或工具
+- 需要的其他 Skills
+
+## Notes
+- 注意事項 1
+- 注意事項 2
+```
+
+---
+
+### 🚀 下一步行動
+
+#### 立即行動（優先級 P0）
+1. ✅ 安裝 Obsidian Skills（已完成）
+2. [ ] 建立 `obsidian-linking.mdc` Rule（Always 模式）
+3. [ ] 開發 `daily-journal-sync` Skill（最常用）
+
+#### 短期行動（優先級 P1）
+1. [ ] 建立 `work-journal-format.mdc` Rule
+2. [ ] 開發 `archive-detector` Skill
+3. [ ] 測試並迭代 Skills
+
+#### 中期行動（優先級 P2）
+1. [ ] 開發 `project-cleanup` Skill
+2. [ ] 開發 `obsidian-link-validator` Skill
+3. [ ] 建立 `commit-message-standard.mdc` Rule
+4. [ ] 探索其他有用的社群 Skills
+
+---
+
+### 💡 使用建議
+
+#### 開發工作流程
+1. **工作報告完成後**：
+   ```
+   /sync-journal  # 觸發 daily-journal-sync Skill
+   ```
+
+2. **準備 Commit 前**：
+   ```
+   /check-archive  # 觸發 archive-detector Skill
+   /validate-links # 觸發 obsidian-link-validator Skill
+   ```
+
+3. **定期維護（每週/每月）**：
+   ```
+   /project-cleanup  # 觸發 project-cleanup Skill
+   ```
+
+#### AI 自動行為
+- **編輯 Markdown 時**：Obsidian Skills 自動啟用
+- **查看工作區檔案時**：work-journal-format Rule 自動套用
+- **任何時候**：obsidian-linking Rule 永遠生效
+
+---
+
+**文件狀態**：✅ 完整版（含 AI 配置指南）  
 **維護者**：專案負責人  
 **最後更新**：2026-01-22  
-**下次更新**：文件架構調整後或新增重大功能時
+**下次更新**：完成第一個自訂 Skill 後
