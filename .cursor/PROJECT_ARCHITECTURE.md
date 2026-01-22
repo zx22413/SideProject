@@ -704,8 +704,8 @@ version: 1.0.0
 
 #### 立即行動（優先級 P0）
 1. ✅ 安裝 Obsidian Skills（已完成）
-2. [ ] 建立 `obsidian-linking.mdc` Rule（Always 模式）
-3. [ ] 開發 `daily-journal-sync` Skill（最常用）
+2. ✅ 建立 `obsidian-linking.mdc` Rule（Always 模式）
+3. ✅ 開發 `daily-journal-sync` Skill（最常用）
 
 #### 短期行動（優先級 P1）
 1. [ ] 建立 `work-journal-format.mdc` Rule
@@ -746,7 +746,7 @@ version: 1.0.0
 
 ---
 
-**文件狀態**：✅ 完整版（含 AI 配置指南）  
+**文件狀態**：✅ 完整版（含 AI 配置指南 + 第一個自訂 Skill）  
 **維護者**：專案負責人  
-**最後更新**：2026-01-22  
-**下次更新**：完成第一個自訂 Skill 後
+**最後更新**：2026-01-23  
+**下次更新**：完成更多 Skills 或優化現有 Skill 後
