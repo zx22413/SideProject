@@ -708,7 +708,7 @@ version: 1.0.0
 3. ✅ 開發 `daily-journal-sync` Skill（最常用）
 
 #### 短期行動（優先級 P1）
-1. [ ] 建立 `work-journal-format.mdc` Rule
+1. ✅ 建立 `work-journal-format.mdc` Rule
 2. [ ] 開發 `archive-detector` Skill
 3. [ ] 測試並迭代 Skills
 

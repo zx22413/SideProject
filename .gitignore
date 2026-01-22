@@ -1,4 +1,4 @@
-# Obsidian settings
+﻿# Obsidian settings
 /.obsidian/workspace.json
 
 # Sensitive files (LINE Token, Google Sheets ID)
@@ -25,4 +25,3 @@ Thumbs.db
 
 # Cursor AI external dependencies
 .cursor/skills/obsidian-skills/
-.cursor/skills/*/
