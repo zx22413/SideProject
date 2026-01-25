@@ -1,4 +1,4 @@
-﻿# Obsidian settings
+# Obsidian settings
 /.obsidian/workspace.json
 
 # Sensitive files (LINE Token, Google Sheets ID)
@@ -10,6 +10,9 @@
 **/*程式碼/*.gs
 **/*程式碼/*.csv
 !**/*程式碼/*.template.gs
+
+# Archive versions (explicitly ignore)
+**/archive-versions/*.gs
 
 # Environment variables
 .env
