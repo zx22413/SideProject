@@ -1,8 +1,8 @@
 // ============================================================
 // 靈魂食堂 - 田中太郎重構版（神秘感優先）
-// 版本: V4.9（Day 3 動態料理系統）
+// 版本: V4.10（Day 1-2 料理演出動態化）
 // 創建日期: 2026-01-20
-// 最後更新: 2026-01-29
+// 最後更新: 2026-01-30
 // 基於: 畫鬼腳 MVP v1.0
 // ============================================================
 // 
@@ -66,6 +66,16 @@
 // - Day 3 料理演出動態化（Part1/Part2/MemoryCard 皆根據結局類型調整）
 // - 黑貓料理評論動態化（三種結局各有不同台詞）
 // - 向下相容：支援新舊料理名稱觸發
+//
+// V4.10 新增功能（2026-01-30）- Day 1-2 料理演出動態化:
+// - 統一採用「有啥食材顯示啥」邏輯（參考 Day 3 設計）
+// - Day 1 熱茶演出動態化：根據實際收集的記憶（針/縫線/寒冷/寧靜/陪伴）
+// - Day 1 熱湯演出動態化：根據實際收集的記憶（雨聲/失憶/迷茫）
+// - Day 2 蜜汁燉菜演出動態化：移除錯誤的「寒冷」，只顯示蜜糖笑容/眼淚
+// - Day 2 苦辛醒神湯演出動態化：根據實際收集的記憶（執念/雪/死亡）
+// - Day 2 苦辛醒神湯記憶劇場改為 Flex Card（閣樓場景 + 雪中場景）
+// - 修改函數：getDay1CookingTea_Part1(state)、getDay1CookingSoup_Part1(state)
+//             getDay2CookingResult(state)、getDay2CookingResult_苦辛(state)
 // ============================================================
 
 // ============================================================
@@ -1787,7 +1797,7 @@ function handleDay1Cooking(event, userId, state, userText) {
     }
     showLoadingAnimation(userId, 5);
     addTopic(userId, state, "cooking_tea_part1");
-    replyMessage(event.replyToken, getDay1CookingTea_Part1());
+    replyMessage(event.replyToken, getDay1CookingTea_Part1(state));  // V4.10: 傳入 state
     return;
   }
   // 處理【繼續】→ Part 2
@@ -1822,7 +1832,7 @@ function handleDay1Cooking(event, userId, state, userText) {
     showLoadingAnimation(userId, 5);
     addTopic(userId, state, "cooking_soup_part1");
     addDishCooked(userId, state, "熱湯");
-    replyMessage(event.replyToken, getDay1CookingSoup_Part1());
+    replyMessage(event.replyToken, getDay1CookingSoup_Part1(state));  // V4.10: 傳入 state
     return;
   }
   // 處理【繼續】→ Part 2（記憶劇場）
@@ -2038,7 +2048,42 @@ function handleDay1After(event, userId, state, userText) {
 }
 
 // Day 1 Cooking Tea - Part 1（烹飪過程）- 最多 5 條消息
-function getDay1CookingTea_Part1() {
+// V4.10 更新：動態顯示玩家實際收集的記憶（有啥食材顯示啥）
+function getDay1CookingTea_Part1(state) {
+  const memories = state ? (state.collectedMemories || []) : [];
+  
+  // 篩選與熱茶相關的記憶
+  const teaMemories = ["針", "縫線", "寒冷", "寧靜", "陪伴"];
+  const collected = memories.filter(m => teaMemories.includes(m));
+  
+  // 根據收集的記憶決定顯示內容
+  let memoryName = "";
+  let memoryVisual = "";
+  let teaColor = "";
+  
+  if (collected.includes("寒冷")) {
+    memoryName = "寒冷的記憶";
+    memoryVisual = "那團發光的藍色霧氣";
+    teaColor = "從透明，變成淡淡的藍。\n\n像冬日的天空。";
+  } else if (collected.includes("針")) {
+    memoryName = "針的記憶";
+    memoryVisual = "那根閃爍的銀色光芒";
+    teaColor = "從透明，變成淡淡的銀。\n\n像月光下的針尖。";
+  } else if (collected.includes("縫線")) {
+    memoryName = "縫線的記憶";
+    memoryVisual = "那縷纏繞的金色絲線";
+    teaColor = "從透明，變成淡淡的金。\n\n像記憶中的絲線。";
+  } else if (collected.includes("寧靜") || collected.includes("陪伴")) {
+    memoryName = "寧靜的記憶";
+    memoryVisual = "那團柔和的暖光";
+    teaColor = "從透明，變成淡淡的暖黃。\n\n像午後的陽光。";
+  } else {
+    // 預設（理論上不應該到這裡，因為解鎖條件會檢查）
+    memoryName = "記憶";
+    memoryVisual = "那團發光的霧氣";
+    teaColor = "從透明，變成了別的顏色。";
+  }
+  
   return [
     {
       type: "text",
@@ -2050,7 +2095,7 @@ function getDay1CookingTea_Part1() {
     },
     {
       type: "text",
-      text: "你：「寒冷的記憶...？」\n\n【你小心地將那團發光的藍色霧氣放入茶壺】"
+      text: `你：「${memoryName}...？」\n\n【你小心地將${memoryVisual}放入茶壺】`
     },
     {
       type: "text",
@@ -2058,7 +2103,7 @@ function getDay1CookingTea_Part1() {
     },
     {
       type: "text",
-      text: "從透明，變成淡淡的藍。\n\n像冬日的天空。",
+      text: teaColor,
       quickReply: {
         items: [{
           type: "action",
@@ -2357,11 +2402,26 @@ function getDay1CookingTea_OLD() {
 }
 
 // Day 1 Cooking Soup - Part 1（烹飪過程）- 最多 5 條消息
-function getDay1CookingSoup_Part1() {
+// V4.10 更新：動態顯示玩家實際收集的記憶（有啥食材顯示啥）
+function getDay1CookingSoup_Part1(state) {
+  const memories = state ? (state.collectedMemories || []) : [];
+  
+  // 篩選與熱湯相關的記憶
+  const soupMemories = ["雨聲", "失憶", "迷茫"];
+  const collected = memories.filter(m => soupMemories.includes(m));
+  
+  // 動態生成記憶食材列表
+  let memoryList = "";
+  if (collected.length > 0) {
+    memoryList = collected.map(m => `「${m}」`).join("、");
+  } else {
+    memoryList = "「記憶」";
+  }
+  
   return [
     {
       type: "text",
-      text: "【烹飪演出】\n\n你將蔬菜、鹽與記憶食材放入鍋中...\n\n「雨聲」、「失憶」、「迷茫」——\n在熱氣裡翻滾，又苦又冷。"
+      text: `【烹飪演出】\n\n你將蔬菜、鹽與記憶食材放入鍋中...\n\n${memoryList}——\n在熱氣裡翻滾，又苦又冷。`
     },
     {
       type: "text",
@@ -3552,7 +3612,7 @@ function handleDay2Cooking(event, userId, state, userText) {
     showLoadingAnimation(userId, 5);
     addDishCooked(userId, state, "蜜汁燉菜");
     updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-    replyMessage(event.replyToken, getDay2CookingResult());
+    replyMessage(event.replyToken, getDay2CookingResult(state));  // V4.10: 傳入 state
     return;
   } else if (userText.includes("苦辛") || userText.includes("醒神") || userText === "【做苦辛醒神湯】") {
     const memories = state.collectedMemories || [];
@@ -3567,7 +3627,7 @@ function handleDay2Cooking(event, userId, state, userText) {
     showLoadingAnimation(userId, 5);
     addDishCooked(userId, state, "苦辛醒神湯");
     updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-    replyMessage(event.replyToken, getDay2CookingResult_苦辛());
+    replyMessage(event.replyToken, getDay2CookingResult_苦辛(state));  // V4.10: 傳入 state
     return;
   } else if (userText.includes("撫慰") || userText.includes("鹹粥") || userText === "【做撫慰鹹粥】") {
     const memories = state.collectedMemories || [];
@@ -3735,11 +3795,30 @@ function getDay2CookingScene(state) {
   };
 }
 
-function getDay2CookingResult() {
+// V4.10 更新：動態顯示玩家實際收集的記憶（有啥食材顯示啥）
+function getDay2CookingResult(state) {
+  const memories = state ? (state.collectedMemories || []) : [];
+  
+  // 篩選與蜜汁燉菜相關的記憶（移除寒冷 - 不是必要食材）
+  const honeyMemories = ["蜜糖笑容", "眼淚"];
+  const collected = memories.filter(m => honeyMemories.includes(m));
+  
+  // 動態生成記憶食材列表
+  let memoryLines = "";
+  if (collected.includes("蜜糖笑容")) {
+    memoryLines += "金色的「蜜糖笑容」\n";
+  }
+  if (collected.includes("眼淚")) {
+    memoryLines += "透明的「眼淚」\n";
+  }
+  if (memoryLines === "") {
+    memoryLines = "「記憶」\n";
+  }
+  
   return [
     {
       type: "text",
-      text: "【烹飪演出】\n\n你將記憶食材一個個放入鍋中...\n\n藍色的「寒冷」\n金色的「蜜糖笑容」\n透明的「眼淚」\n\n它們在鍋中交融。"
+      text: `【烹飪演出】\n\n你將記憶食材一個個放入鍋中...\n\n${memoryLines}\n它們在鍋中交融。`
     },
     {
       type: "text",
@@ -3885,23 +3964,193 @@ function getDay2CookingResult() {
 }
 
 /** Day 2 料理結果：苦辛醒神湯。最後一針 + 雪中。≤5 則一次 reply。 */
-function getDay2CookingResult_苦辛() {
+// V4.10 更新：動態顯示玩家實際收集的記憶 + 記憶劇場改為 Flex Card
+function getDay2CookingResult_苦辛(state) {
+  const memories = state ? (state.collectedMemories || []) : [];
+  
+  // 篩選與苦辛醒神湯相關的記憶
+  const bitterMemories = ["執念", "雪", "死亡"];
+  const collected = memories.filter(m => bitterMemories.includes(m));
+  
+  // 動態生成記憶食材列表
+  let memoryList = "";
+  if (collected.length > 0) {
+    memoryList = collected.map(m => `「${m}」`).join("、");
+  } else {
+    memoryList = "「記憶」";
+  }
+  
   return [
     {
       type: "text",
-      text: "【烹飪演出】\n\n你將薑、鹹魚與記憶食材放入鍋中...\n\n「執念」、「雪」、「死亡」——\n在熱氣裡翻滾，又苦又冷。"
+      text: `【烹飪演出】\n\n你將薑、鹹魚與記憶食材放入鍋中...\n\n${memoryList}——\n在熱氣裡翻滾，又苦又冷。`
     },
     {
       type: "text",
       text: "[料理完成]\n\n深色的湯，冒著熱氣。\n\n【你將湯端給老人】\n\n【他舀起一口，放進嘴裡】\n\n【老人的表情變了】\n\n「這個味道...」\n「是苦的。又苦又冷...」\n「像雪一樣...」"
     },
+    // V4.10：記憶劇場改為 Flex Card
     {
-      type: "text",
-      text: "【記憶劇場】\n\n閣樓，聖誕夜，大雪。\n他坐在婚紗前，手抖得厲害。\n「最後⋯⋯一針⋯⋯」\n穿針，引線，刺入。\n\n完成了。\n「雪子⋯⋯我做好了⋯⋯」\n他把婚紗疊好，放進衣櫃。\n「等美雪⋯⋯來找⋯⋯」"
+      type: "flex",
+      altText: "記憶劇場 - 閣樓",
+      contents: {
+        type: "bubble",
+        styles: {
+          body: { backgroundColor: "#1A237E" }
+        },
+        body: {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "text",
+              text: "💭 記憶劇場",
+              weight: "bold",
+              color: "#FFD700",
+              size: "sm"
+            },
+            {
+              type: "separator",
+              margin: "md",
+              color: "#3949AB"
+            },
+            {
+              type: "text",
+              text: "【閣樓，聖誕夜，大雪】",
+              size: "xs",
+              color: "#7986CB",
+              margin: "md"
+            },
+            {
+              type: "text",
+              text: "他坐在婚紗前，手抖得厲害。",
+              wrap: true,
+              color: "#E8EAF6",
+              margin: "md",
+              size: "sm"
+            },
+            {
+              type: "text",
+              text: "「最後⋯⋯一針⋯⋯」",
+              wrap: true,
+              color: "#FFFFFF",
+              margin: "sm"
+            },
+            {
+              type: "text",
+              text: "穿針，引線，刺入。",
+              wrap: true,
+              color: "#E8EAF6",
+              margin: "sm",
+              size: "sm"
+            },
+            {
+              type: "text",
+              text: "完成了。",
+              wrap: true,
+              color: "#FFD700",
+              margin: "md",
+              weight: "bold"
+            },
+            {
+              type: "text",
+              text: "「雪子⋯⋯我做好了⋯⋯」",
+              wrap: true,
+              color: "#FFFFFF",
+              margin: "sm"
+            },
+            {
+              type: "text",
+              text: "他把婚紗疊好，放進衣櫃。\n「等美雪⋯⋯來找⋯⋯」",
+              wrap: true,
+              color: "#B0BEC5",
+              margin: "md",
+              size: "sm"
+            }
+          ]
+        }
+      }
     },
+    // 第二段記憶劇場 Flex Card
     {
-      type: "text",
-      text: "【記憶劇場】\n\n雪中，他走了一夜。\n「好冷⋯⋯」「美雪⋯⋯」\n他想起舉著畫跑進工房的小女孩、做了太甜便當的女兒。\n「爸爸要工作了⋯⋯你自己玩⋯⋯」\n眼淚結成冰。\n「對不起⋯⋯」「我做好了⋯⋯婚紗在櫃子裡⋯⋯」\n雪覆蓋住他。很冷。但心裡，有一點點溫暖。"
+      type: "flex",
+      altText: "記憶劇場 - 雪中",
+      contents: {
+        type: "bubble",
+        styles: {
+          body: { backgroundColor: "#263238" }
+        },
+        body: {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "text",
+              text: "💭 記憶劇場",
+              weight: "bold",
+              color: "#81D4FA",
+              size: "sm"
+            },
+            {
+              type: "separator",
+              margin: "md",
+              color: "#37474F"
+            },
+            {
+              type: "text",
+              text: "【雪中，他走了一夜】",
+              size: "xs",
+              color: "#78909C",
+              margin: "md"
+            },
+            {
+              type: "text",
+              text: "「好冷⋯⋯」「美雪⋯⋯」",
+              wrap: true,
+              color: "#ECEFF1",
+              margin: "md"
+            },
+            {
+              type: "text",
+              text: "他想起舉著畫跑進工房的小女孩、\n做了太甜便當的女兒。",
+              wrap: true,
+              color: "#B0BEC5",
+              margin: "sm",
+              size: "sm"
+            },
+            {
+              type: "text",
+              text: "「爸爸要工作了⋯⋯你自己玩⋯⋯」",
+              wrap: true,
+              color: "#90A4AE",
+              margin: "md",
+              size: "sm"
+            },
+            {
+              type: "text",
+              text: "眼淚結成冰。",
+              wrap: true,
+              color: "#81D4FA",
+              margin: "md"
+            },
+            {
+              type: "text",
+              text: "「對不起⋯⋯」\n「我做好了⋯⋯婚紗在櫃子裡⋯⋯」",
+              wrap: true,
+              color: "#FFFFFF",
+              margin: "sm"
+            },
+            {
+              type: "text",
+              text: "雪覆蓋住他。很冷。\n但心裡，有一點點溫暖。",
+              wrap: true,
+              color: "#FFD54F",
+              margin: "md",
+              size: "sm"
+            }
+          ]
+        }
+      }
     },
     getDay2AfterFlex("又苦又冷", "「這味道……好冷。雪一直下。」", "「我……做好了……」")
   ];
