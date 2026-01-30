@@ -1,11 +1,92 @@
-// 靈魂食堂 V4.0 - 配置模板
-// 複製此文件並重命名為 config.gs，填入真實值
+// ============================================================
+// 靈魂食堂 - 配置說明文件
+// ============================================================
+// 
+// ⚠️ 重要：此版本使用 GAS Script Properties 管理敏感資訊
+// 你不需要建立 config.gs 檔案，只需要在 GAS 後台設定即可
+//
+// ============================================================
 
-// ⚠️ 請勿將 config.gs 推送到 Git
-// config.gs 已在 .gitignore 中被忽略
+// ============================================================
+// 🔐 Script Properties 設定步驟（一次性設定）
+// ============================================================
+//
+// 1. 開啟你的 GAS 專案網頁介面
+//    https://script.google.com/
+//
+// 2. 點擊左側的「專案設定」（齒輪圖示 ⚙️）
+//
+// 3. 滑到最下方找到「指令碼屬性 (Script Properties)」
+//
+// 4. 點擊「新增指令碼屬性」，加入以下兩個屬性：
+//
+//    ┌─────────────────────────────┬──────────────────────────────────────┐
+//    │ 屬性 (Property)              │ 值 (Value)                           │
+//    ├─────────────────────────────┼──────────────────────────────────────┤
+//    │ SPREADSHEET_ID              │ 你的 Google Sheets ID                │
+//    │                             │ （從試算表網址中複製）                  │
+//    ├─────────────────────────────┼──────────────────────────────────────┤
+//    │ LINE_CHANNEL_ACCESS_TOKEN   │ 你的 LINE Channel Access Token       │
+//    │                             │ （從 LINE Developers Console 取得）   │
+//    └─────────────────────────────┴──────────────────────────────────────┘
+//
+// 5. 按下「儲存」即完成！
+//
+// ============================================================
 
-const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';
-const TOKEN = 'YOUR_LINE_CHANNEL_ACCESS_TOKEN_HERE';
+// ============================================================
+// 📋 如何取得這些值？
+// ============================================================
+//
+// 【SPREADSHEET_ID】
+// 從你的 Google Sheets 網址中擷取：
+// https://docs.google.com/spreadsheets/d/【這串就是ID】/edit
+// 例如：1A2b3C4d5E6f7G8h9I0j...
+//
+// 【LINE_CHANNEL_ACCESS_TOKEN】
+// 1. 前往 LINE Developers Console: https://developers.line.biz/
+// 2. 選擇你的 Messaging API Channel
+// 3. 到「Messaging API」頁籤
+// 4. 找到「Channel access token」區塊
+// 5. 點擊「Issue」生成 Token（或複製已有的）
+//
+// ============================================================
 
-// DEBUG 模式開關（上線前必須改為 false）
-const IS_DEBUG_MODE = true;
+// ============================================================
+// 🧪 驗證設定是否成功
+// ============================================================
+//
+// 在 GAS 編輯器中執行以下函數來測試：
+//
+function testScriptProperties() {
+  const props = PropertiesService.getScriptProperties();
+  const sheetId = props.getProperty('SPREADSHEET_ID');
+  const token = props.getProperty('LINE_CHANNEL_ACCESS_TOKEN');
+  
+  Logger.log('=== Script Properties 測試 ===');
+  Logger.log('SPREADSHEET_ID: ' + (sheetId ? '✅ 已設定 (' + sheetId.substring(0, 10) + '...)' : '❌ 未設定'));
+  Logger.log('LINE_CHANNEL_ACCESS_TOKEN: ' + (token ? '✅ 已設定 (長度: ' + token.length + ')' : '❌ 未設定'));
+  
+  if (!sheetId || !token) {
+    Logger.log('\n⚠️ 請到「專案設定」→「指令碼屬性」中設定缺少的值');
+  } else {
+    Logger.log('\n🎉 所有必要設定都已完成！');
+  }
+}
+//
+// 執行後查看「執行記錄」確認結果
+//
+// ============================================================
+
+// ============================================================
+// 📝 非敏感配置（直接在主程式碼中設定）
+// ============================================================
+//
+// 以下配置不含敏感資訊，可以直接修改主程式碼：
+//
+// const CONFIG = {
+//   SHEET_NAME: "userStateTanaka",  // Sheet 分頁名稱
+//   DEBUG_MODE: true                // 上線前改為 false
+// };
+//
+// ============================================================
