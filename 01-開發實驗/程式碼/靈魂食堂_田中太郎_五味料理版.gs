@@ -5569,7 +5569,7 @@ function handleBiographyRequest(userState) {
     isUnlocked: hasSweet,
     bgColor: "#6C5CE7",
     // 外部連結（需要用戶自行設定）
-    url: "https://hackmd.io/@YourName/Tanaka_Part1"
+    url: "https://www.notion.so/_-_-2f6d3b4f9e7080928334f33a445485eb?source=copy_link"
   }));
 
   // ===== 卡片 2：中篇（苦味結局解鎖）=====
@@ -5580,7 +5580,7 @@ function handleBiographyRequest(userState) {
     lockedDesc: "達成【帶遺憾離去】結局解鎖\n(試著讓他面對最深的痛苦...)",
     isUnlocked: hasBitter,
     bgColor: "#2D3436",
-    url: "https://hackmd.io/@YourName/Tanaka_Part2"
+    url: "https://www.notion.so/_-_-2f6d3b4f9e7080a193c5ce1dced5e5fb?source=copy_link"
   }));
 
   // ===== 卡片 3：後篇（平衡結局解鎖）=====
@@ -5591,7 +5591,7 @@ function handleBiographyRequest(userState) {
     lockedDesc: "達成【釋懷的旅程】結局解鎖\n(試著讓他想起一切...)",
     isUnlocked: hasBalanced,
     bgColor: "#00B894",
-    url: "https://hackmd.io/@YourName/Tanaka_Part3"
+    url: "https://www.notion.so/_-_-2f6d3b4f9e7080678edae876cdc1ca99?source=copy_link"
   }));
 
   return {
