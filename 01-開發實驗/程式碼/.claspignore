@@ -1,0 +1,16 @@
+# clasp 忽略清單
+# 這些文件不會被 clasp push 推送到 GAS
+
+# 歸檔版本（不需要推送）
+archive-versions/**
+
+# 配置模板（只是說明文件）
+config.template.gs
+
+# 其他不需要的文件
+*.md
+*.csv
+*.txt
+
+# clasp pull 下載的重複文件
+程式碼.js
