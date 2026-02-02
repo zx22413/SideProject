@@ -1672,6 +1672,13 @@ function getDay1HandsMemoryCard() {
     altText: "記憶碎片",
     contents: {
       type: "bubble",
+      hero: {
+        type: "image",
+        url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day1_memory_hands_needle.png",
+        size: "full",
+        aspectRatio: "3:2",
+        aspectMode: "cover"
+      },
       body: {
         type: "box",
         layout: "vertical",
