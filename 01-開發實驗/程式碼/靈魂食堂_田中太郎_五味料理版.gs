@@ -3368,6 +3368,13 @@ function getDay2MemoryCard1() {
     altText: "記憶碎片",
     contents: {
       type: "bubble",
+      hero: {
+        type: "image",
+        url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day2_memory_drawing.png",
+        size: "full",
+        aspectRatio: "3:2",
+        aspectMode: "cover"
+      },
       body: {
         type: "box",
         layout: "vertical",
@@ -3429,6 +3436,13 @@ function getDay2MemoryCard2() {
     altText: "記憶碎片",
     contents: {
       type: "bubble",
+      hero: {
+        type: "image",
+        url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day2_memory_wedding_news.png",
+        size: "full",
+        aspectRatio: "3:2",
+        aspectMode: "cover"
+      },
       body: {
         type: "box",
         layout: "vertical",
@@ -3504,6 +3518,13 @@ function getDay2MemoryCard3() {
     altText: "記憶碎片",
     contents: {
       type: "bubble",
+      hero: {
+        type: "image",
+        url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day2_memory_promise.png",
+        size: "full",
+        aspectRatio: "3:2",
+        aspectMode: "cover"
+      },
       body: {
         type: "box",
         layout: "vertical",
@@ -4009,6 +4030,13 @@ function getDay2CookingResult_苦辛(state) {
       altText: "記憶劇場 - 閣樓",
       contents: {
         type: "bubble",
+        hero: {
+          type: "image",
+          url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day2_memory_last_stitch.png",
+          size: "full",
+          aspectRatio: "3:2",
+          aspectMode: "cover"
+        },
         styles: {
           body: { backgroundColor: "#1A237E" }
         },
@@ -4091,6 +4119,13 @@ function getDay2CookingResult_苦辛(state) {
       altText: "記憶劇場 - 雪中",
       contents: {
         type: "bubble",
+        hero: {
+          type: "image",
+          url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day2_memory_snow.png",
+          size: "full",
+          aspectRatio: "3:2",
+          aspectMode: "cover"
+        },
         styles: {
           body: { backgroundColor: "#263238" }
         },
@@ -4182,8 +4217,36 @@ function getDay2CookingResult_撫慰() {
       text: "【老人吃了一口，手停在半空中】\n\n「...雪子？」"
     },
     {
-      type: "text",
-      text: "【記憶劇場】\n\n年輕的田中（笨拙地）：\n「我...這件衣服...」\n\n雪子（笑著接話）：\n「你是想說，這件衣服領口改低了，是因為擔心她脖子不舒服，對吧？」\n\n田中：「...嗯。」\n\n雪子：「別擔心，我會幫你翻譯的。你的針線話，我都聽得懂。」"
+      type: "flex",
+      altText: "記憶劇場 - 翻譯者",
+      contents: {
+        type: "bubble",
+        hero: {
+          type: "image",
+          url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day2_memory_translator.png",
+          size: "full",
+          aspectRatio: "3:2",
+          aspectMode: "cover"
+        },
+        styles: {
+          body: { backgroundColor: "#FFF9E6" }
+        },
+        body: {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            { type: "text", text: "💭 記憶劇場", weight: "bold", color: "#FFD700", size: "sm" },
+            { type: "separator", margin: "md", color: "#FFD700" },
+            { type: "text", text: "年輕的田中（笨拙地）：", size: "xs", color: "#999999", margin: "md" },
+            { type: "text", text: "「我...這件衣服...」", wrap: true, margin: "xs" },
+            { type: "text", text: "雪子（笑著接話）：", size: "xs", color: "#999999", margin: "md" },
+            { type: "text", text: "「你是想說，這件衣服領口改低了，是因為擔心她脖子不舒服，對吧？」", wrap: true, margin: "xs", size: "sm" },
+            { type: "text", text: "田中：「...嗯。」", wrap: true, margin: "md", color: "#AAAAAA" },
+            { type: "text", text: "雪子：", size: "xs", color: "#999999", margin: "md" },
+            { type: "text", text: "「別擔心，我會幫你翻譯的。\n你的針線話，我都聽得懂。」", wrap: true, margin: "xs", weight: "bold" }
+          ]
+        }
+      }
     },
     {
       type: "text",
