@@ -1,6 +1,6 @@
 // ============================================================
 // 靈魂食堂 - 田中太郎重構版（神秘感優先）
-// 版本: V4.11（Day 1-2 記憶碎片 Hero 圖整合）
+// 版本: V4.12（Day 3 告別場景 Hero 圖整合）
 // 創建日期: 2026-01-20
 // 最後更新: 2026-02-02
 // 基於: 畫鬼腳 MVP v1.0
@@ -76,6 +76,10 @@
 // - Day 2 苦辛醒神湯記憶劇場改為 Flex Card（閣樓場景 + 雪中場景）
 // - 修改函數：getDay1CookingTea_Part1(state)、getDay1CookingSoup_Part1(state)
 //             getDay2CookingResult(state)、getDay2CookingResult_苦辛(state)
+//
+// V4.12 新增功能（2026-02-03）- Day 3 告別場景 Hero 圖整合:
+//   - 告別場景根據結局類型顯示不同 Hero 圖（苦味/甜味/平衡）
+//   - 修復圖片緩存問題（day1_memory_hands_needle、day2_memory_promise 加上 ?v=2）
 //
 // V4.11 新增功能（2026-02-02）- Day 1-2 記憶碎片 Hero 圖整合:
 // - 視覺風格：Hollow Knight / Alto's Odyssey 美學
@@ -1684,7 +1688,7 @@ function getDay1HandsMemoryCard() {
       type: "bubble",
       hero: {
         type: "image",
-        url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day1_memory_hands_needle.png",
+        url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day1_memory_hands_needle.png?v=2",
         size: "full",
         aspectRatio: "3:2",
         aspectMode: "cover"
@@ -3530,7 +3534,7 @@ function getDay2MemoryCard3() {
       type: "bubble",
       hero: {
         type: "image",
-        url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day2_memory_promise.png",
+        url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day2_memory_promise.png?v=2",
         size: "full",
         aspectRatio: "3:2",
         aspectMode: "cover"
@@ -5159,12 +5163,29 @@ function getDay3Farewell(state, userId) {
   // ============================================================
   let farewellBody = buildFarewellBody(endingType, memories, isFullCollection);
 
+  // ============================================================
+  // 6. 告別 Hero 圖（根據結局類型）
+  // ============================================================
+  let farewellHeroUrl = "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day3_farewell_balanced.png";
+  if (endingType === "ENDING_BITTER") {
+    farewellHeroUrl = "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day3_farewell_bitter.png";
+  } else if (endingType === "ENDING_SWEET") {
+    farewellHeroUrl = "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day3_farewell_sweet.png";
+  }
+
   return [
     {
       type: "flex",
       altText: "告別",
       contents: {
         type: "bubble",
+        hero: {
+          type: "image",
+          url: farewellHeroUrl,
+          size: "full",
+          aspectRatio: "3:2",
+          aspectMode: "cover"
+        },
         body: {
           type: "box",
           layout: "vertical",
