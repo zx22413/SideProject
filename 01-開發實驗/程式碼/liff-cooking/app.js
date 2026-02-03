@@ -8,9 +8,9 @@
 // ============================================
 const CONFIG = {
   // TODO: 替換為實際的 LIFF ID
-  LIFF_ID: 'YOUR_LIFF_ID_HERE',
+  LIFF_ID: '2009042883-1e0HSFLa',
   // TODO: 替換為實際的 GAS Web App URL
-  GAS_API_URL: 'YOUR_GAS_WEB_APP_URL_HERE',
+  GAS_API_URL: 'https://script.google.com/macros/s/AKfycbzO5iC6ezFNxtqN3JiMmBYk9_R8exUP_ZTPth6O9NHzd__3G678oz3rruxpsdYMood5og/exec',
   // 最少需要選擇的記憶數量
   MIN_MEMORIES: 1,
   // 最多可選擇的記憶數量

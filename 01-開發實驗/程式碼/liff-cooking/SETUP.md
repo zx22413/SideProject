@@ -15,13 +15,13 @@
 2. 點擊 **Add** 按鈕
 3. 填寫以下資訊：
 
-| 欄位 | 建議值 |
-|------|--------|
-| LIFF app name | 靈魂食堂料理 |
-| Size | Full（全螢幕）或 Tall（3/4 螢幕） |
-| Endpoint URL | `https://你的用戶名.github.io/SideProject/01-開發實驗/程式碼/liff-cooking/` |
-| Scope | 勾選 `profile` |
-| Bot link feature | On (Aggressive) |
+| 欄位               | 建議值                                                             |
+| ---------------- | --------------------------------------------------------------- |
+| LIFF app name    | 靈魂食堂料理                                                          |
+| Size             | Full（全螢幕）或 Tall（3/4 螢幕）                                         |
+| Endpoint URL     | `https://你的用戶名.github.io/SideProject/01-開發實驗/程式碼/liff-cooking/` |
+| Scope            | 勾選 `profile`                                                    |
+| Bot link feature | On (Aggressive)                                                 |
 
 4. 點擊 **Add** 完成建立
 5. 記下 **LIFF ID**（格式：`1234567890-xxxxxxxx`）
