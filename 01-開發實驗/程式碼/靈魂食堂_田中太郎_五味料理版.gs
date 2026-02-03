@@ -77,12 +77,14 @@
 // - 修改函數：getDay1CookingTea_Part1(state)、getDay1CookingSoup_Part1(state)
 //             getDay2CookingResult(state)、getDay2CookingResult_苦辛(state)
 //
-// V4.13 新增功能（2026-02-03）- LIFF 做飯小遊戲 API:
+// V4.13 新增功能（2026-02-03）- LIFF 做飯小遊戲 API + 遺物圖片:
 //   - doGet() 新增 LIFF API 路由處理
 //   - getCookingStateForLiff(userId) - 返回玩家可用記憶
 //   - submitCookingFromLiff(userId, selectedMemories) - 處理料理提交
 //   - calculateEndingFromMemories(memories) - 從記憶計算結局
 //   - getDishNameByEnding(endingType) - 取得料理名稱
+//   - 遺物圖鑑卡片改用圖片（彎曲的針/泛黃照片/銀頂針）
+//   - createHeirloomCard() 支援 imageUrl 參數
 //
 // V4.12 新增功能（2026-02-03）- Day 3 告別場景 Hero 圖整合:
 //   - 告別場景根據結局類型顯示不同 Hero 圖（苦味/甜味/平衡）
@@ -5765,6 +5767,13 @@ function handleHeirloomRequest(userState) {
     "BALANCED": { obtained: false, name: "???", desc: "", date: "" }
   };
 
+  // 遺物圖片 URL（V4.13 新增）
+  const HEIRLOOM_IMAGES = {
+    BITTER: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/heirloom_bitter_bent_needle.png",
+    SWEET: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/heirloom_sweet_photo.png",
+    BALANCED: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/heirloom_balanced_thimble.png"
+  };
+
   // 建立三張卡片
   const bubbles = [];
 
@@ -5772,6 +5781,7 @@ function handleHeirloomRequest(userState) {
   bubbles.push(createHeirloomCard({
     type: "BITTER",
     emoji: "🪡",
+    imageUrl: HEIRLOOM_IMAGES.BITTER,
     defaultName: "彎曲的縫紉針",
     heirloom: heirlooms["BITTER"],
     lockedHint: "達成【帶遺憾離去】結局解鎖",
@@ -5782,6 +5792,7 @@ function handleHeirloomRequest(userState) {
   bubbles.push(createHeirloomCard({
     type: "SWEET",
     emoji: "📷",
+    imageUrl: HEIRLOOM_IMAGES.SWEET,
     defaultName: "泛黃的照片",
     heirloom: heirlooms["SWEET"],
     lockedHint: "達成【沉浸美好】結局解鎖",
@@ -5792,6 +5803,7 @@ function handleHeirloomRequest(userState) {
   bubbles.push(createHeirloomCard({
     type: "BALANCED",
     emoji: "🧵",
+    imageUrl: HEIRLOOM_IMAGES.BALANCED,
     defaultName: "銀頂針",
     heirloom: heirlooms["BALANCED"],
     lockedHint: "達成【釋懷的旅程】結局解鎖",
@@ -5809,19 +5821,19 @@ function handleHeirloomRequest(userState) {
 }
 
 /**
- * 建立單張遺物卡片
+ * 建立單張遺物卡片（V4.13 更新：支援圖片）
  * @param {object} config - 卡片配置
  * @returns {object} Flex Bubble
  */
 function createHeirloomCard(config) {
-  const { type, emoji, defaultName, heirloom, lockedHint, bgColor } = config;
+  const { type, emoji, imageUrl, defaultName, heirloom, lockedHint, bgColor } = config;
   const isUnlocked = heirloom && heirloom.obtained;
 
   if (isUnlocked) {
-    // 已解鎖版本
+    // 已解鎖版本 - 顯示遺物圖片
     return {
       type: "bubble",
-      size: "micro",
+      size: "kilo",
       header: {
         type: "box",
         layout: "vertical",
@@ -5831,24 +5843,30 @@ function createHeirloomCard(config) {
         backgroundColor: bgColor,
         paddingAll: "sm"
       },
+      hero: {
+        type: "image",
+        url: imageUrl,
+        size: "full",
+        aspectRatio: "3:2",
+        aspectMode: "cover"
+      },
       body: {
         type: "box",
         layout: "vertical",
         contents: [
-          { type: "text", text: emoji, size: "4xl", align: "center" },
-          { type: "text", text: heirloom.name || defaultName, weight: "bold", align: "center", margin: "md", wrap: true },
+          { type: "text", text: heirloom.name || defaultName, weight: "bold", align: "center", wrap: true },
           { type: "separator", margin: "md" },
           { type: "text", text: heirloom.desc || "無描述", size: "xs", color: "#666666", align: "center", wrap: true, margin: "md" },
           { type: "text", text: "獲得日期：" + (heirloom.date || "未知"), size: "xxs", color: "#999999", align: "center", margin: "md" }
         ],
-        paddingAll: "lg"
+        paddingAll: "md"
       }
     };
   } else {
-    // 未解鎖版本
+    // 未解鎖版本 - 顯示問號
     return {
       type: "bubble",
-      size: "micro",
+      size: "kilo",
       header: {
         type: "box",
         layout: "vertical",
