@@ -1,8 +1,8 @@
 // ============================================================
 // 靈魂食堂 - 田中太郎重構版（神秘感優先）
-// 版本: V4.12（Day 3 告別場景 Hero 圖整合）
+// 版本: V4.13（LIFF 做飯小遊戲 API）
 // 創建日期: 2026-01-20
-// 最後更新: 2026-02-02
+// 最後更新: 2026-02-03
 // 基於: 畫鬼腳 MVP v1.0
 // ============================================================
 // 
@@ -77,6 +77,13 @@
 // - 修改函數：getDay1CookingTea_Part1(state)、getDay1CookingSoup_Part1(state)
 //             getDay2CookingResult(state)、getDay2CookingResult_苦辛(state)
 //
+// V4.13 新增功能（2026-02-03）- LIFF 做飯小遊戲 API:
+//   - doGet() 新增 LIFF API 路由處理
+//   - getCookingStateForLiff(userId) - 返回玩家可用記憶
+//   - submitCookingFromLiff(userId, selectedMemories) - 處理料理提交
+//   - calculateEndingFromMemories(memories) - 從記憶計算結局
+//   - getDishNameByEnding(endingType) - 取得料理名稱
+//
 // V4.12 新增功能（2026-02-03）- Day 3 告別場景 Hero 圖整合:
 //   - 告別場景根據結局類型顯示不同 Hero 圖（苦味/甜味/平衡）
 //   - 修復圖片緩存問題（day1_memory_hands_needle、day2_memory_promise 加上 ?v=2）
@@ -113,7 +120,13 @@ const LINE_TOKEN = scriptProperties.getProperty('LINE_CHANNEL_ACCESS_TOKEN') || 
 const CONFIG = {
   LINE_CHANNEL_ACCESS_TOKEN: LINE_TOKEN,  // 從 Script Properties 讀取
   SHEET_NAME: "userStateTanaka",
-  DEBUG_MODE: true  // 上線前改為 false
+  DEBUG_MODE: true,  // 上線前改為 false
+  
+  // LIFF 做飯小遊戲設定（V4.13 新增）
+  // TODO: 替換為實際的 LIFF ID
+  LIFF_ENABLED: false,  // 設為 true 啟用 LIFF 料理模式
+  LIFF_ID: 'YOUR_LIFF_ID_HERE',
+  LIFF_URL: 'https://liff.line.me/YOUR_LIFF_ID_HERE'
 };
 
 // 時段定義
@@ -201,11 +214,224 @@ function doPost(e) {
 }
 
 // ============================================================
-// GET 請求處理（供測試用）
+// GET 請求處理（LIFF API + 測試用）
 // ============================================================
 function doGet(e) {
+  // 如果有 action 參數，處理 LIFF API 請求
+  if (e && e.parameter && e.parameter.action) {
+    return handleLiffApiGet(e);
+  }
+  
+  // 預設：測試回應
   return ContentService.createTextOutput("靈魂食堂 - 田中太郎版 is running! ✅")
     .setMimeType(ContentService.MimeType.TEXT);
+}
+
+// ============================================================
+// LIFF API - GET 請求處理
+// ============================================================
+function handleLiffApiGet(e) {
+  const action = e.parameter.action;
+  const userId = e.parameter.userId;
+  
+  // CORS headers - 允許 LIFF 跨域請求
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type'
+  };
+  
+  try {
+    let result;
+    
+    switch (action) {
+      case 'getCookingState':
+        result = getCookingStateForLiff(userId);
+        break;
+      case 'ping':
+        result = { status: 'ok', timestamp: new Date().toISOString() };
+        break;
+      default:
+        result = { error: 'Unknown action', action: action };
+    }
+    
+    return ContentService
+      .createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (error) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ error: error.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ============================================================
+// LIFF API - getCookingState
+// 返回玩家可用的記憶食材
+// ============================================================
+function getCookingStateForLiff(userId) {
+  if (!userId) {
+    return { error: 'userId is required' };
+  }
+  
+  const state = getUserState(userId);
+  
+  if (!state) {
+    return {
+      error: 'User not found',
+      currentDay: 0,
+      collectedMemories: [],
+      phase: 'unknown'
+    };
+  }
+  
+  // 返回料理所需的資料
+  return {
+    userId: userId,
+    currentDay: state.currentDay,
+    phase: state.phase,
+    collectedMemories: state.collectedMemories || [],
+    topicsDone: state.topicsDone || []
+  };
+}
+
+// ============================================================
+// LIFF API - POST 請求處理（料理提交）
+// 注意：需要在 doPost 中添加 LIFF 路由，或者使用獨立的 Web App
+// ============================================================
+function submitCookingFromLiff(userId, selectedMemories) {
+  if (!userId || !selectedMemories || selectedMemories.length === 0) {
+    return { error: 'Invalid parameters' };
+  }
+  
+  const state = getUserState(userId);
+  if (!state) {
+    return { error: 'User not found' };
+  }
+  
+  // 計算五味結局
+  const endingType = calculateEndingFromMemories(selectedMemories);
+  
+  // 取得對應的料理名稱
+  const dishName = getDishNameByEnding(endingType);
+  
+  return {
+    success: true,
+    userId: userId,
+    selectedMemories: selectedMemories,
+    endingType: endingType,
+    dishName: dishName
+  };
+}
+
+// ============================================================
+// LIFF 輔助函數 - 從記憶計算結局
+// ============================================================
+function calculateEndingFromMemories(memories) {
+  // 五味計數
+  const flavorCount = {
+    sweet: 0,
+    sour: 0,
+    bitter: 0,
+    spicy: 0,
+    salty: 0
+  };
+  
+  // 記憶到五味的映射
+  const memoryFlavorMap = {
+    "裁縫手藝": "sweet",
+    "失去的名字": "salty",
+    "空蕩的店": "bitter",
+    "銀座的驕傲": "sweet",
+    "小女孩畫作": "sweet",
+    "結婚消息": "sour",
+    "深夜呢喃": "bitter",
+    "缺席的典禮": "sour",
+    "失語": "spicy",
+    "童年的茶": "sweet",
+    "送茶的小手": "sweet",
+    "空蕩工房": "bitter",
+    "最後一針": "bitter",
+    "雪中行走": "spicy",
+    "翻譯者": "salty"
+  };
+  
+  // 統計五味
+  memories.forEach(memory => {
+    const flavor = memoryFlavorMap[memory];
+    if (flavor && flavorCount[flavor] !== undefined) {
+      flavorCount[flavor]++;
+    }
+  });
+  
+  // 判斷主導味道
+  const sweetSour = flavorCount.sweet + flavorCount.sour;
+  const bitterSpicy = flavorCount.bitter + flavorCount.spicy;
+  
+  if (sweetSour > bitterSpicy + 1) {
+    return "ENDING_SWEET";
+  } else if (bitterSpicy > sweetSour + 1) {
+    return "ENDING_BITTER";
+  } else {
+    return "ENDING_BALANCED";
+  }
+}
+
+// ============================================================
+// LIFF 輔助函數 - 取得料理名稱
+// ============================================================
+function getDishNameByEnding(endingType) {
+  switch (endingType) {
+    case "ENDING_SWEET":
+      return "糖霜幻景拼盤";
+    case "ENDING_BITTER":
+      return "千針冷骨湯";
+    case "ENDING_BALANCED":
+    default:
+      return "百味蜜汁炙燒魚";
+  }
+}
+
+// ============================================================
+// LIFF 料理按鈕生成（用於整合到料理場景）
+// ============================================================
+/**
+ * 生成 LIFF 料理按鈕（URI 類型）
+ * 當 CONFIG.LIFF_ENABLED 為 true 時，料理場景可使用此按鈕取代傳統按鈕
+ * 
+ * 整合方式（以 Day 1 為例）：
+ * 1. 在 getDay1CookingScene() 中，將傳統按鈕替換為 LIFF 按鈕
+ * 2. 玩家點擊後會打開 LIFF 網頁，拖拉食材完成料理
+ * 3. LIFF 完成後自動回傳結果到聊天室
+ * 
+ * @param {string} label - 按鈕文字
+ * @returns {object} Flex Message 按鈕元件
+ */
+function getLiffCookingButton(label) {
+  if (!CONFIG.LIFF_ENABLED || CONFIG.LIFF_ID === 'YOUR_LIFF_ID_HERE') {
+    // LIFF 未啟用，返回空物件
+    return null;
+  }
+  
+  return {
+    type: "button",
+    action: {
+      type: "uri",
+      label: label || "🍳 開始料理",
+      uri: CONFIG.LIFF_URL
+    },
+    style: "primary",
+    color: "#e09f3e"
+  };
+}
+
+/**
+ * 檢查是否應使用 LIFF 料理模式
+ * @returns {boolean}
+ */
+function shouldUseLiffCooking() {
+  return CONFIG.LIFF_ENABLED && CONFIG.LIFF_ID !== 'YOUR_LIFF_ID_HERE';
 }
 
 // ============================================================

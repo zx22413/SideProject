@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>靈魂食堂 - 料理中</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- LIFF SDK -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- 載入畫面 -->
+    <div id="loading" class="screen">
+      <div class="loading-text">準備食材中...</div>
+    </div>
+
+    <!-- 料理畫面 -->
+    <div id="cooking" class="screen hidden">
+      <!-- 黑貓反應區 -->
+      <div id="cat-area">
+        <div id="cat-avatar">🐈‍⬛</div>
+        <div id="cat-bubble" class="bubble hidden">
+          <span id="cat-text"></span>
+        </div>
+      </div>
+
+      <!-- 鍋子區域 -->
+      <div id="pot-area">
+        <div id="pot" class="droppable">
+          <div id="pot-contents"></div>
+          <div id="pot-hint">將記憶拖到這裡</div>
+        </div>
+      </div>
+
+      <!-- 已選記憶 -->
+      <div id="selected-area">
+        <div class="area-label">已選記憶</div>
+        <div id="selected-memories"></div>
+      </div>
+
+      <!-- 記憶托盤 -->
+      <div id="memory-tray">
+        <div class="area-label">可用記憶</div>
+        <div id="memory-list"></div>
+      </div>
+
+      <!-- 操作按鈕 -->
+      <div id="action-area">
+        <button id="btn-reset" class="btn btn-secondary">重新選擇</button>
+        <button id="btn-cook" class="btn btn-primary" disabled>完成料理</button>
+      </div>
+    </div>
+
+    <!-- 完成畫面 -->
+    <div id="complete" class="screen hidden">
+      <div class="complete-text">料理完成！</div>
+      <div id="result-dish"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
