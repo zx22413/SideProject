@@ -1436,7 +1436,7 @@ function getDay1DayShift(state) {
       type: "button",
       action: {
         type: "message",
-        label: "🗨️ 你的手（推薦）",
+        label: "🗨️ 你的手",
         text: "你的手...是做什麼工作的？"
       },
       style: "primary",
@@ -2853,7 +2853,7 @@ function getDay2DayShift(state) {
       type: "button",
       action: {
         type: "message",
-        label: "💭 那個夢（推薦）",
+        label: "💭 那個夢",
         text: "你夢到了什麼？"
       },
       style: "primary",
