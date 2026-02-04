@@ -5435,24 +5435,39 @@ function getDay3Farewell(state, userId) {
         }
       }
     },
-    {
-      type: "flex",
-      altText: "遺物",
-      contents: {
-        type: "bubble",
-        body: {
-          type: "box",
-          layout: "vertical",
-          contents: [
-            { type: "text", text: "🎁 遺物", weight: "bold", size: "xl", color: "#FFD700", align: "center" },
-            { type: "separator", margin: "md" },
-            { type: "text", text: heirloomEmoji, size: "5xl", align: "center", margin: "lg" },
-            { type: "text", text: heirloomName, align: "center", weight: "bold", margin: "md" },
-            { type: "text", text: heirloomDesc, align: "center", size: "xs", color: "#999999", wrap: true, margin: "md" }
-          ]
+    (function() {
+      // 遺物圖片 URL（與 handleHeirloomRequest 一致，V4.13）
+      var HEIRLOOM_IMAGE_URLS = {
+        ENDING_BITTER: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/heirloom_bitter_bent_needle.png",
+        ENDING_SWEET: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/heirloom_sweet_photo.png",
+        ENDING_BALANCED: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/heirloom_balanced_thimble.png"
+      };
+      var heirloomImageUrl = HEIRLOOM_IMAGE_URLS[endingType] || HEIRLOOM_IMAGE_URLS.ENDING_BALANCED;
+      return {
+        type: "flex",
+        altText: "遺物",
+        contents: {
+          type: "bubble",
+          hero: {
+            type: "image",
+            url: heirloomImageUrl,
+            size: "full",
+            aspectRatio: "3:2",
+            aspectMode: "cover"
+          },
+          body: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              { type: "text", text: "🎁 遺物", weight: "bold", size: "xl", color: "#FFD700", align: "center" },
+              { type: "separator", margin: "md" },
+              { type: "text", text: heirloomName, align: "center", weight: "bold", margin: "md" },
+              { type: "text", text: heirloomDesc, align: "center", size: "xs", color: "#999999", wrap: true, margin: "md" }
+            ]
+          }
         }
-      }
-    },
+      };
+    })(),
     {
       type: "text",
       text: "━━━━━━━━━━━━━━━\n\n" + catLine + "\n\n━━━━━━━━━━━━━━━\n\n⭐ Guest 1 完結\n\n感謝遊玩！",
@@ -6150,8 +6165,8 @@ function handleOpenBio(event, userId, state) {
     return;
   }
   
-  // 允許查看：生成紀傳 Flex Card（附帶回程票按鈕）
-  replyMessage(event.replyToken, handleBiographyRequestWithReturn(state));
+  // 允許查看：用 push 發送（Loading 動畫後 reply token 可能失效，改用 push 確保有回應）
+  pushMessages(userId, handleBiographyRequestWithReturn(state));
 }
 
 /**
@@ -6176,8 +6191,8 @@ function handleOpenHeirloom(event, userId, state) {
     return;
   }
   
-  // 允許查看：生成遺物 Flex Card（附帶回程票按鈕）
-  replyMessage(event.replyToken, handleHeirloomRequestWithReturn(state));
+  // 允許查看：用 push 發送（Loading 動畫後 reply token 可能失效，改用 push 確保有回應）
+  pushMessages(userId, handleHeirloomRequestWithReturn(state));
 }
 
 /**
@@ -6330,12 +6345,11 @@ function getFlavorBar(value, max) {
  */
 function handleHeirloomRequestWithReturn(userState) {
   const original = handleHeirloomRequest(userState);
-  
-  // 在 carousel 最後添加一張「返回」卡片
+  // 在 carousel 最後添加一張「返回」卡片（LINE 規定輪播內所有 bubble 必須同尺寸，故用 kilo 與前三張一致）
   if (original.contents && original.contents.type === "carousel") {
     original.contents.contents.push({
       type: "bubble",
-      size: "micro",
+      size: "kilo",
       body: {
         type: "box",
         layout: "vertical",
