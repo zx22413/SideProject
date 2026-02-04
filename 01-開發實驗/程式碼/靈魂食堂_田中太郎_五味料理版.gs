@@ -2,7 +2,9 @@
 // 靈魂食堂 - 田中太郎重構版（神秘感優先）
 // 版本: V4.13（LIFF 做飯小遊戲 API）
 // 創建日期: 2026-01-20
-// 最後更新: 2026-02-03
+// 最後更新: 2026-02-04
+// - [Hotfix] 整合遺物圖片顯示功能，更新 Flex Card 結構以包含圖片，並調整回應方式為 push 以確保用戶接收。
+//            修正 carousel 最後一張卡片的尺寸以符合 LINE 規範。
 // 基於: 畫鬼腳 MVP v1.0
 // ============================================================
 // 
@@ -126,9 +128,9 @@ const CONFIG = {
   
   // LIFF 做飯小遊戲設定（V4.13 新增）
   // TODO: 替換為實際的 LIFF ID
-  LIFF_ENABLED: false,  // 設為 true 啟用 LIFF 料理模式
-  LIFF_ID: 'YOUR_LIFF_ID_HERE',
-  LIFF_URL: 'https://liff.line.me/YOUR_LIFF_ID_HERE'
+  LIFF_ENABLED: true,  // 設為 true 啟用 LIFF 料理模式，設為 false 關閉 LIFF 料理模式
+  LIFF_ID: '2009042883-1e0HSFLa',
+  LIFF_URL: 'https://liff.line.me/2009042883-1e0HSFLa'
 };
 
 // 時段定義
