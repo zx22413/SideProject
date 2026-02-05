@@ -82,6 +82,8 @@ let state = {
   userId: null,
   currentDay: 1,
   availableMemories: [],
+  availableRecipes: [],
+  recipeRequirements: {},
   selectedMemories: [],
   isInitialized: false
 };
@@ -95,6 +97,7 @@ const elements = {
   complete: null,
   catBubble: null,
   catText: null,
+  recipePanel: null,
   pot: null,
   potContents: null,
   potHint: null,
@@ -119,8 +122,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 取得料理狀態
     await fetchCookingState();
     
-    // 渲染記憶托盤
+    // 渲染記憶托盤與可做料理區塊
     renderMemoryTray();
+    renderRecipePanel();
     
     // 設定事件監聽
     setupEventListeners();
@@ -145,6 +149,7 @@ function initElements() {
   elements.complete = document.getElementById('complete');
   elements.catBubble = document.getElementById('cat-bubble');
   elements.catText = document.getElementById('cat-text');
+  elements.recipePanel = document.getElementById('recipe-panel');
   elements.pot = document.getElementById('pot');
   elements.potContents = document.getElementById('pot-contents');
   elements.potHint = document.getElementById('pot-hint');
@@ -180,6 +185,37 @@ async function initLiff() {
 // ============================================
 // API 呼叫
 // ============================================
+// 與 GAS getDay1/2AvailableRecipes 一致的靜態對照表（開發模式與 fallback 用）
+const RECIPE_REQUIREMENTS_FALLBACK = {
+  "熱茶": "寒冷、針、縫線 或 寧靜＋陪伴",
+  "熱湯": "雨聲、失憶 或 迷茫",
+  "蜜汁燉菜": "蜜糖笑容 ＋ 眼淚",
+  "苦辛醒神湯": "執念 ＋ （雪 或 死亡）",
+  "撫慰鹹粥": "寧靜 ＋ 陪伴",
+  "糖霜幻景拼盤": "依五味結算（甜味偏多）",
+  "千針冷骨湯": "依五味結算（苦辣偏多）",
+  "百味蜜汁炙燒魚": "依五味結算（平衡）"
+};
+
+function getAvailableRecipesForDay(day, memories) {
+  const m = (x) => (memories || []).includes(x);
+  if (day === 1) {
+    const out = [];
+    if (m("寒冷") || m("針") || m("縫線") || (m("寧靜") && m("陪伴"))) out.push("熱茶");
+    if (m("雨聲") || m("失憶") || m("迷茫")) out.push("熱湯");
+    return out;
+  }
+  if (day === 2) {
+    const out = [];
+    if (m("蜜糖笑容") && m("眼淚")) out.push("蜜汁燉菜");
+    if (m("執念") && (m("雪") || m("死亡"))) out.push("苦辛醒神湯");
+    if (m("寧靜") && m("陪伴")) out.push("撫慰鹹粥");
+    return out;
+  }
+  if (day === 3) return ["糖霜幻景拼盤", "千針冷骨湯", "百味蜜汁炙燒魚"];
+  return [];
+}
+
 async function fetchCookingState() {
   // 開發模式：使用測試數據
   if (CONFIG.GAS_API_URL === 'YOUR_GAS_WEB_APP_URL_HERE') {
@@ -190,6 +226,8 @@ async function fetchCookingState() {
       "小女孩畫作", "結婚消息", "深夜呢喃",
       "童年的茶", "送茶的小手"
     ];
+    state.availableRecipes = getAvailableRecipesForDay(state.currentDay, state.availableMemories);
+    state.recipeRequirements = RECIPE_REQUIREMENTS_FALLBACK;
     return;
   }
   
@@ -198,6 +236,8 @@ async function fetchCookingState() {
   
   state.currentDay = data.currentDay || 1;
   state.availableMemories = data.collectedMemories || [];
+  state.availableRecipes = data.availableRecipes || getAvailableRecipesForDay(state.currentDay, state.availableMemories);
+  state.recipeRequirements = data.recipeRequirements || RECIPE_REQUIREMENTS_FALLBACK;
 }
 
 async function submitCooking() {
@@ -224,16 +264,32 @@ async function submitCooking() {
   
   const result = await response.json();
   
+  // API 錯誤時不送【料理完成】完成料理，改顯示錯誤並留在料理畫面
+  if (result.error) {
+    console.warn('submitCooking 後端錯誤:', result);
+    showCatDialogue('「出了點問題…無法完成料理，請再試一次。」');
+    elements.btnCook.disabled = false;
+    elements.btnCook.textContent = '完成料理';
+    return;
+  }
+  
   // 顯示完成畫面
   showScreen('complete');
   elements.resultDish.textContent = result.dishName || '料理完成';
   
-  // 發送訊息回 LINE
-  if (liff.isInClient()) {
+  // 僅在成功且取得有效 dishName 時才發送回 LINE
+  if (liff.isInClient() && result.dishName) {
     await liff.sendMessages([{
       type: 'text',
-      text: `【料理完成】${result.dishName || '完成料理'}`
+      text: `【料理完成】${result.dishName}`
     }]);
+  } else if (liff.isInClient() && !result.dishName) {
+    console.warn('submitCooking 未回傳 dishName:', result);
+    showScreen('cooking');
+    showCatDialogue('「料理結果無法辨識…請再選一次食材。」');
+    elements.btnCook.disabled = false;
+    elements.btnCook.textContent = '完成料理';
+    return;
   }
   
   // 關閉 LIFF
@@ -247,6 +303,25 @@ async function submitCooking() {
 // ============================================
 // 渲染
 // ============================================
+function renderRecipePanel() {
+  if (!elements.recipePanel) return;
+  const recipes = state.availableRecipes || [];
+  const reqMap = state.recipeRequirements || RECIPE_REQUIREMENTS_FALLBACK;
+  if (recipes.length === 0) {
+    elements.recipePanel.innerHTML = '<p class="recipe-panel-empty">還缺食材…再多跟他聊聊吧。</p>';
+    elements.recipePanel.classList.add('empty');
+    return;
+  }
+  elements.recipePanel.classList.remove('empty');
+  let html = '<p class="recipe-panel-title">本日可做料理</p><ul class="recipe-list">';
+  recipes.forEach(dishName => {
+    const req = reqMap[dishName] || '';
+    html += `<li class="recipe-item"><span class="recipe-dish">${dishName}</span><span class="recipe-req">所需：${req}</span></li>`;
+  });
+  html += '</ul>';
+  elements.recipePanel.innerHTML = html;
+}
+
 function renderMemoryTray() {
   elements.memoryList.innerHTML = '';
   

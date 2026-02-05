@@ -1,8 +1,8 @@
 // ============================================================
 // 靈魂食堂 - 田中太郎重構版（神秘感優先）
-// 版本: V4.13（LIFF 做飯小遊戲 API）
+// 版本: V4.14 (優化LIFF體驗)
 // 創建日期: 2026-01-20
-// 最後更新: 2026-02-04
+// 最後更新: 2026-02-05
 // - [Hotfix] 整合遺物圖片顯示功能，更新 Flex Card 結構以包含圖片，並調整回應方式為 push 以確保用戶接收。
 //            修正 carousel 最後一張卡片的尺寸以符合 LINE 規範。
 // 基於: 畫鬼腳 MVP v1.0
@@ -276,8 +276,22 @@ function handleLiffApiGet(e) {
 }
 
 // ============================================================
+// LIFF API - 料理所需食材對照表（與 getDay1/2AvailableRecipes 一致）
+// ============================================================
+var LIFF_RECIPE_REQUIREMENTS = {
+  "熱茶": "寒冷、針、縫線 或 寧靜＋陪伴",
+  "熱湯": "雨聲、失憶 或 迷茫",
+  "蜜汁燉菜": "蜜糖笑容 ＋ 眼淚",
+  "苦辛醒神湯": "執念 ＋ （雪 或 死亡）",
+  "撫慰鹹粥": "寧靜 ＋ 陪伴",
+  "糖霜幻景拼盤": "依五味結算（甜味偏多）",
+  "千針冷骨湯": "依五味結算（苦辣偏多）",
+  "百味蜜汁炙燒魚": "依五味結算（平衡）"
+};
+
+// ============================================================
 // LIFF API - getCookingState
-// 返回玩家可用的記憶食材
+// 返回玩家可用的記憶食材、當日可做料理與所需食材表
 // ============================================================
 function getCookingStateForLiff(userId) {
   if (!userId) {
@@ -295,13 +309,26 @@ function getCookingStateForLiff(userId) {
     };
   }
   
-  // 返回料理所需的資料
+  const memories = state.collectedMemories || [];
+  const day = state.currentDay || 1;
+  var availableRecipes = [];
+  if (day === 1) {
+    availableRecipes = getDay1AvailableRecipes(memories);
+  } else if (day === 2) {
+    availableRecipes = getDay2AvailableRecipes(memories);
+  } else if (day === 3) {
+    availableRecipes = ["糖霜幻景拼盤", "千針冷骨湯", "百味蜜汁炙燒魚"];
+  }
+  
+  // 返回料理所需的資料（含當日可做料理與所需食材對照表）
   return {
     userId: userId,
-    currentDay: state.currentDay,
+    currentDay: day,
     phase: state.phase,
-    collectedMemories: state.collectedMemories || [],
-    topicsDone: state.topicsDone || []
+    collectedMemories: memories,
+    topicsDone: state.topicsDone || [],
+    availableRecipes: availableRecipes,
+    recipeRequirements: LIFF_RECIPE_REQUIREMENTS
   };
 }
 
@@ -564,10 +591,19 @@ function handleMessage(event) {
   // ============================================================
   if (userText.startsWith("【料理完成】")) {
     const dishName = userText.replace("【料理完成】", "").trim();
+    if (CONFIG.DEBUG_MODE) {
+      Logger.log("【料理完成】 userId=" + userId + " dishName=" + dishName + " currentDay=" + (state ? state.currentDay : "null") + " memories=" + (state && state.collectedMemories ? state.collectedMemories.length : 0));
+    }
     if (dishName && state) {
       const handled = handleLiffCookingCompleteMessage(event, userId, state, dishName);
       if (handled) return;
     }
+    // 未處理時回覆明確說明，不 fallback 到廚房場景（避免被誤解為「食材有缺」）
+    replyMessage(event.replyToken, {
+      type: "text",
+      text: "【黑貓】\n「料理結果無法辨識…請再試一次。若問題持續，請從廚房再次點選開始料理。」"
+    });
+    return;
   }
   
   // ============================================================
