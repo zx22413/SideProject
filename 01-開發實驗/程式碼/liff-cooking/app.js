@@ -301,12 +301,28 @@ async function submitCooking() {
   elements.resultDish.textContent = result.dishName || '料理完成';
   
   // 僅在成功且取得有效 dishName 時才發送回 LINE
-  if (liff.isInClient() && result.dishName) {
-    await liff.sendMessages([{
-      type: 'text',
-      text: `【料理完成】${result.dishName}`
-    }]);
-  } else if (liff.isInClient() && !result.dishName) {
+  const isInClient = !!liff.isInClient();
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'before sendMessages',data:{isInClient,dishName:result.dishName,willSend:isInClient&&!!result.dishName},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+  // #endregion
+  if (isInClient && result.dishName) {
+    try {
+      await liff.sendMessages([{
+        type: 'text',
+        text: `【料理完成】${result.dishName}`
+      }]);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'sendMessages success',data:{dishName:result.dishName},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
+    } catch (sendErr) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'sendMessages failed',data:{error:String(sendErr),dishName:result.dishName},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
+      console.error('liff.sendMessages 失敗:', sendErr);
+      showCatDialogue('「無法傳送料理結果…請確認在 LINE 內開啟，並稍後再試。」');
+      return;
+    }
+  } else if (isInClient && !result.dishName) {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'branch no dishName',data:{success:result.success,dishName:result.dishName,fullResult:result},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
     // #endregion
@@ -320,6 +336,9 @@ async function submitCooking() {
   
   // 關閉 LIFF
   setTimeout(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'before closeWindow',data:{isInClient:!!liff.isInClient()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
     if (liff.isInClient()) {
       liff.closeWindow();
     }

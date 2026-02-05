@@ -608,11 +608,10 @@ function handleMessage(event) {
   // ============================================================
   if (userText.startsWith("【料理完成】")) {
     const dishName = userText.replace("【料理完成】", "").trim();
-    if (CONFIG.DEBUG_MODE) {
-      Logger.log("【料理完成】 userId=" + userId + " dishName=" + dishName + " currentDay=" + (state ? state.currentDay : "null") + " memories=" + (state && state.collectedMemories ? state.collectedMemories.length : 0));
-    }
+    Logger.log("【料理完成】 userId=" + userId + " dishName=" + dishName + " currentDay=" + (state ? state.currentDay : "null") + " handled=" + (dishName && state ? "pending" : "skip"));
     if (dishName && state) {
       const handled = handleLiffCookingCompleteMessage(event, userId, state, dishName);
+      Logger.log("【料理完成】 handleLiffCookingCompleteMessage returned handled=" + handled);
       if (handled) return;
     }
     // 未處理時回覆明確說明，不 fallback 到廚房場景（避免被誤解為「食材有缺」）
