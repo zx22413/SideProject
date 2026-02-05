@@ -272,6 +272,15 @@ function handleLiffApiGet(e) {
           }
         }
         break;
+      case 'pushCookingComplete':
+        // 當 isInClient=false 時，LIFF 無法 sendMessages，改由此 API 主動推送劇情
+        var dishName = e.parameter.dishName;
+        if (!userId || !dishName) {
+          result = { error: 'Invalid parameters', message: 'userId and dishName required' };
+        } else {
+          result = pushLiffCookingCompleteStoryline(userId, dishName);
+        }
+        break;
       case 'ping':
         result = { status: 'ok', timestamp: new Date().toISOString() };
         break;
@@ -533,6 +542,54 @@ function handleLiffCookingCompleteMessage(event, userId, state, dishName) {
     return true;
   }
   return false;
+}
+
+/**
+ * 當 LIFF 在外部瀏覽器開啟（isInClient=false）時，無法使用 sendMessages，
+ * 改由此 API 主動推送劇情。邏輯與 handleLiffCookingCompleteMessage 相同，改用 pushMessages。
+ * @returns {{ success: boolean, error?: string }}
+ */
+function pushLiffCookingCompleteStoryline(userId, dishName) {
+  const state = getUserState(userId);
+  if (!state || !dishName) {
+    return { success: false, error: 'User state or dishName missing' };
+  }
+  const day = state.currentDay || 1;
+  showLoadingAnimation(userId, 5);
+  if (day === 1) {
+    if (dishName === "熱茶") {
+      addTopic(userId, state, "cooking_tea_part1");
+      pushMessages(userId, getDay1CookingTea_Part1(state));
+      return { success: true };
+    }
+    if (dishName === "熱湯") {
+      addTopic(userId, state, "cooking_soup_part1");
+      pushMessages(userId, getDay1CookingSoup_Part1(state));
+      return { success: true };
+    }
+  }
+  if (day === 2) {
+    if (dishName === "蜜汁燉菜") {
+      pushMessages(userId, getDay2CookingResult(state));
+      return { success: true };
+    }
+    if (dishName === "苦辛醒神湯") {
+      pushMessages(userId, getDay2CookingResult_苦辛(state));
+      return { success: true };
+    }
+    if (dishName === "撫慰鹹粥") {
+      addMemory(userId, state, "失語");
+      pushMessages(userId, getDay2CookingResult_撫慰());
+      return { success: true };
+    }
+  }
+  if (day === 3 && (dishName === "糖霜幻景拼盤" || dishName === "千針冷骨湯" || dishName === "百味蜜汁炙燒魚")) {
+    addTopic(userId, state, "cooking_final_part1");
+    addTopic(userId, state, "cooking_final_part2");
+    pushMessages(userId, getDay3CookingProcess_Part2(state));
+    return { success: true };
+  }
+  return { success: false, error: 'dishName not matched' };
 }
 
 // ============================================================

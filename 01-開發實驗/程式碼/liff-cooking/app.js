@@ -332,9 +332,29 @@ async function submitCooking() {
     elements.btnCook.disabled = false;
     elements.btnCook.textContent = '完成料理';
     return;
+  } else if (!isInClient && result.dishName) {
+    // isInClient=false（外部瀏覽器或 LINE 環境異常），無法 sendMessages，改呼叫 GAS API 主動推送劇情
+    try {
+      const pushUrl = `${CONFIG.GAS_API_URL}?action=pushCookingComplete&userId=${encodeURIComponent(state.userId)}&dishName=${encodeURIComponent(result.dishName)}`;
+      const pushRes = await fetch(pushUrl);
+      const pushData = await pushRes.json().catch(() => ({}));
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'pushCookingComplete fallback',data:{success:pushData.success,dishName:result.dishName,error:pushData.error},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
+      if (!pushData.success) {
+        console.warn('pushCookingComplete 失敗:', pushData);
+      } else {
+        showCatDialogue('「料理完成了。請回到 LINE 聊天室查看後續劇情。」');
+      }
+    } catch (pushErr) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'pushCookingComplete error',data:{error:String(pushErr)},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
+      console.error('pushCookingComplete 請求失敗:', pushErr);
+    }
   }
   
-  // 關閉 LIFF
+  // 關閉 LIFF（isInClient 時）或提示回到 LINE
   setTimeout(() => {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'before closeWindow',data:{isInClient:!!liff.isInClient()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
