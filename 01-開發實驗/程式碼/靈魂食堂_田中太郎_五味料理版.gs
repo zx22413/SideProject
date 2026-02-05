@@ -257,6 +257,21 @@ function handleLiffApiGet(e) {
       case 'getCookingState':
         result = getCookingStateForLiff(userId);
         break;
+      case 'submitCooking':
+        // GET 提交料理（避免 CORS preflight），參數：userId, selectedMemories（JSON 字串）
+        var selectedJson = e.parameter.selectedMemories;
+        if (!userId || selectedJson === undefined) {
+          result = { error: 'Invalid parameters', message: 'userId and selectedMemories required' };
+        } else {
+          try {
+            var selected = JSON.parse(selectedJson);
+            if (!Array.isArray(selected)) selected = [];
+            result = applyLiffSubmitCooking(userId, selected);
+          } catch (err) {
+            result = { error: 'Invalid parameters', message: 'selectedMemories must be JSON array' };
+          }
+        }
+        break;
       case 'ping':
         result = { status: 'ok', timestamp: new Date().toISOString() };
         break;
@@ -447,20 +462,15 @@ function getDishNameByEnding(endingType) {
 }
 
 /**
- * doPost 內處理 LIFF 料理提交：更新玩家狀態並回傳 dishName
- * LIFF 會再以 sendMessage 發「【料理完成】{dishName}」，由 handleMessage 推送後續劇情
+ * 共用：依 userId + selectedMemories 計算料理結果並更新玩家狀態，回傳 { success, dishName } 或 { error }。
+ * 供 doPost (handleLiffSubmitCooking) 與 doGet (submitCooking) 使用。
  */
-function handleLiffSubmitCooking(data) {
-  const result = submitCookingFromLiff(data.userId, data.selectedMemories);
-  if (result.error || !result.success) {
-    return ContentService.createTextOutput(JSON.stringify(result))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-  const userId = data.userId;
+function applyLiffSubmitCooking(userId, selectedMemories) {
+  const result = submitCookingFromLiff(userId, selectedMemories);
+  if (result.error || !result.success) return result;
   const state = getUserState(userId);
   if (state) {
     addDishCooked(userId, state, result.dishName);
-    // Day 3 不在此改 phase，留待使用者按「端出料理」時再改，其餘改為 AFTER
     const currentDay = state.currentDay || 1;
     if (currentDay !== 3) {
       updateUserState(userId, {
@@ -469,10 +479,17 @@ function handleLiffSubmitCooking(data) {
       });
     }
   }
-  return ContentService.createTextOutput(JSON.stringify({
-    success: true,
-    dishName: result.dishName
-  })).setMimeType(ContentService.MimeType.JSON);
+  return { success: true, dishName: result.dishName };
+}
+
+/**
+ * doPost 內處理 LIFF 料理提交：更新玩家狀態並回傳 dishName
+ * LIFF 會再以 sendMessage 發「【料理完成】{dishName}」，由 handleMessage 推送後續劇情
+ */
+function handleLiffSubmitCooking(data) {
+  const result = applyLiffSubmitCooking(data.userId, data.selectedMemories);
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 /**

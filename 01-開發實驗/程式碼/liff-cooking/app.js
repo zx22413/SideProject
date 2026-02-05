@@ -233,11 +233,17 @@ async function fetchCookingState() {
   
   const response = await fetch(`${CONFIG.GAS_API_URL}?action=getCookingState&userId=${state.userId}`);
   const data = await response.json();
-  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:fetchCookingState',message:'getCookingState response',data:{currentDay:data.currentDay,collectedMemories:data.collectedMemories,availableRecipes:data.availableRecipes,error:data.error,hasRecipeRequirements:!!data.recipeRequirements},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+  // #endregion
+
   state.currentDay = data.currentDay || 1;
   state.availableMemories = data.collectedMemories || [];
   state.availableRecipes = data.availableRecipes || getAvailableRecipesForDay(state.currentDay, state.availableMemories);
   state.recipeRequirements = data.recipeRequirements || RECIPE_REQUIREMENTS_FALLBACK;
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:fetchCookingState',message:'state after assign',data:{currentDay:state.currentDay,availableRecipes:state.availableRecipes,availableMemoriesLen:state.availableMemories.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+  // #endregion
 }
 
 async function submitCooking() {
@@ -253,19 +259,36 @@ async function submitCooking() {
     return;
   }
   
-  const response = await fetch(`${CONFIG.GAS_API_URL}?action=submitCooking`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      userId: state.userId,
-      selectedMemories: state.selectedMemories
-    })
+  // 使用 GET 提交料理，避免 CORS preflight（從 GitHub Pages 等跨域時 POST 會被擋）
+  const params = new URLSearchParams({
+    action: 'submitCooking',
+    userId: state.userId,
+    selectedMemories: JSON.stringify(state.selectedMemories)
   });
-  
-  const result = await response.json();
-  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'GET payload before send',data:{userId:state.userId,selectedMemories:state.selectedMemories,isArray:Array.isArray(state.selectedMemories)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+  // #endregion
+  const response = await fetch(`${CONFIG.GAS_API_URL}?${params.toString()}`);
+  const responseText = await response.text();
+  let result;
+  try {
+    result = responseText ? JSON.parse(responseText) : {};
+  } catch (parseErr) {
+    window.__lastLiffError = { type: 'json_parse_error', parseErr: String(parseErr), status: response.status, raw: responseText.slice(0, 500) };
+    console.warn('[LIFF_DEBUG] submitCooking response not JSON:', window.__lastLiffError);
+    throw parseErr;
+  }
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'submitCooking result',data:{error:result.error,success:result.success,dishName:result.dishName,hasDishName:!!result.dishName},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+  // #endregion
+  window.__lastLiffError = result;
+  if (result.error || !result.dishName) console.warn('[LIFF_DEBUG] submitCooking result:', result);
+
   // API 錯誤時不送【料理完成】完成料理，改顯示錯誤並留在料理畫面
   if (result.error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'branch result.error',data:{error:result.error,fullResult:result},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
     console.warn('submitCooking 後端錯誤:', result);
     showCatDialogue('「出了點問題…無法完成料理，請再試一次。」');
     elements.btnCook.disabled = false;
@@ -284,6 +307,9 @@ async function submitCooking() {
       text: `【料理完成】${result.dishName}`
     }]);
   } else if (liff.isInClient() && !result.dishName) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'branch no dishName',data:{success:result.success,dishName:result.dishName,fullResult:result},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
     console.warn('submitCooking 未回傳 dishName:', result);
     showScreen('cooking');
     showCatDialogue('「料理結果無法辨識…請再選一次食材。」');
@@ -308,6 +334,9 @@ function renderRecipePanel() {
   const recipes = state.availableRecipes || [];
   const reqMap = state.recipeRequirements || RECIPE_REQUIREMENTS_FALLBACK;
   if (recipes.length === 0) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:renderRecipePanel',message:'showing 還缺食材',data:{recipesLength:recipes.length,currentDay:state.currentDay},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
     elements.recipePanel.innerHTML = '<p class="recipe-panel-empty">還缺食材…再多跟他聊聊吧。</p>';
     elements.recipePanel.classList.add('empty');
     return;
@@ -535,14 +564,20 @@ function handleReset() {
 
 async function handleCook() {
   if (state.selectedMemories.length < CONFIG.MIN_MEMORIES) return;
-  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:handleCook',message:'click 完成料理',data:{selectedMemories:state.selectedMemories,currentDay:state.currentDay,availableRecipes:state.availableRecipes},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+  // #endregion
   elements.btnCook.disabled = true;
   elements.btnCook.textContent = '料理中...';
-  
+
   try {
     await submitCooking();
   } catch (error) {
-    console.error('料理失敗:', error);
+    window.__lastLiffError = window.__lastLiffError || { type: 'catch', error: String(error), message: error && error.message };
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:handleCook',message:'submitCooking catch',data:{error:String(error),message:error&&error.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
+    console.error('[LIFF_DEBUG] 料理失敗:', error, '| 詳情 copy(JSON.stringify(window.__lastLiffError))');
     showCatDialogue('「出了點問題...再試一次？」');
     elements.btnCook.disabled = false;
     elements.btnCook.textContent = '完成料理';
