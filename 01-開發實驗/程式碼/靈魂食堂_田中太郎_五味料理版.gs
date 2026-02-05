@@ -2491,6 +2491,31 @@ function getDay1CookingScene(state) {
 // Day 1 After Hours - 記憶劇場
 // ============================================================
 function handleDay1After(event, userId, state, userText) {
+  const topicsDone = state ? (state.topicsDone || []) : [];
+  
+  // LIFF 料理完成後 phase 已為 AFTER，【繼續】須在此處理（與 handleDay1Cooking 邏輯對齊）
+  if (userText === "【繼續】" && topicsDone.includes("cooking_tea_part1") && !topicsDone.includes("cooking_tea_part2")) {
+    showLoadingAnimation(userId, 5);
+    addTopic(userId, state, "cooking_tea_part2");
+    replyMessage(event.replyToken, getDay1CookingTea_Part2());
+    return;
+  }
+  if (userText === "【繼續】" && topicsDone.includes("cooking_tea_part2") && !topicsDone.includes("cooking_tea_part3")) {
+    showLoadingAnimation(userId, 5);
+    addTopic(userId, state, "cooking_tea_part3");
+    addDishCooked(userId, state, "熱茶");
+    updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
+    replyMessage(event.replyToken, getDay1CookingTea_Part3());
+    return;
+  }
+  if (userText === "【繼續】" && topicsDone.includes("cooking_soup_part1") && !topicsDone.includes("cooking_soup_part2")) {
+    showLoadingAnimation(userId, 5);
+    addTopic(userId, state, "cooking_soup_part2");
+    updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
+    replyMessage(event.replyToken, getDay1CookingSoup_Part2());
+    return;
+  }
+  
   // 處理「明天繼續」
   if (userText === "【明天繼續】" || userText === "明天繼續" || userText === "明天") {
     showLoadingAnimation(userId, 5);
