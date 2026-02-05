@@ -40,7 +40,9 @@ const MEMORY_FLAVOR_MAP = {
   "空蕩工房": { flavor: "bitter", icon: "🔧" },
   "最後一針": { flavor: "bitter", icon: "🪡" },
   "雪中行走": { flavor: "spicy", icon: "❄️" },
-  "翻譯者": { flavor: "salty", icon: "💑" }
+  "翻譯者": { flavor: "salty", icon: "💑" },
+  // Day 3 專用：全部記憶（單一泡泡，後端以 collectedMemories 結算）
+  "全部記憶": { flavor: "balanced", icon: "📚" }
 };
 
 // ============================================
@@ -212,6 +214,7 @@ function getAvailableRecipesForDay(day, memories) {
     if (m("寧靜") && m("陪伴")) out.push("撫慰鹹粥");
     return out;
   }
+  // Day 3 由後端依結局只回傳一道，此處僅 fallback
   if (day === 3) return ["糖霜幻景拼盤", "千針冷骨湯", "百味蜜汁炙燒魚"];
   return [];
 }
@@ -376,6 +379,13 @@ function renderRecipePanel() {
 
 function renderMemoryTray() {
   elements.memoryList.innerHTML = '';
+  
+  // 最後一天（Day 3）只顯示「全部記憶」一個泡泡，節省拖曳時間；結算仍用後端 collectedMemories
+  if (state.currentDay === 3) {
+    const tag = createMemoryTag("全部記憶");
+    elements.memoryList.appendChild(tag);
+    return;
+  }
   
   state.availableMemories.forEach(memory => {
     const tag = createMemoryTag(memory);

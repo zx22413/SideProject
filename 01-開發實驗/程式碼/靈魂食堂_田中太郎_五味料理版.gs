@@ -343,7 +343,9 @@ function getCookingStateForLiff(userId) {
   } else if (day === 2) {
     availableRecipes = getDay2AvailableRecipes(memories);
   } else if (day === 3) {
-    availableRecipes = ["糖霜幻景拼盤", "千針冷骨湯", "百味蜜汁炙燒魚"];
+    // Day 3 只顯示「結局已結算」的那一道料理（依已收集記憶預先計算）
+    const endingType = calculateEndingFromMemories(memories);
+    availableRecipes = [getDishNameByEnding(endingType)];
   }
   
   // 返回料理所需的資料（含當日可做料理與所需食材對照表）
@@ -372,8 +374,15 @@ function submitCookingFromLiff(userId, selectedMemories) {
     return { error: 'User not found' };
   }
   
-  const endingType = calculateEndingFromMemories(selectedMemories);
-  const dishName = getDishNameForLiffSubmit(state.currentDay || 1, selectedMemories, endingType);
+  // Day 3 若前端送「全部記憶」泡泡，改用以收集的全部記憶結算（不影響已獲得、不影響結局邏輯）
+  var memoriesForEnding = selectedMemories;
+  if ((state.currentDay || 1) === 3 &&
+      selectedMemories.length === 1 && selectedMemories[0] === "全部記憶") {
+    memoriesForEnding = state.collectedMemories || [];
+  }
+  
+  const endingType = calculateEndingFromMemories(memoriesForEnding);
+  const dishName = getDishNameForLiffSubmit(state.currentDay || 1, memoriesForEnding, endingType);
   
   return {
     success: true,
