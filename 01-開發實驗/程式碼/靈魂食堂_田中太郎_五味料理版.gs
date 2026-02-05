@@ -1,13 +1,11 @@
 // ============================================================
 // 靈魂食堂 - 田中太郎重構版（神秘感優先）
-// 版本: V4.14 (優化LIFF體驗)
+// 版本: V4.14 (優化 LIFF 體驗)
 // 創建日期: 2026-01-20
 // 最後更新: 2026-02-05
-// - [Hotfix] 整合遺物圖片顯示功能，更新 Flex Card 結構以包含圖片，並調整回應方式為 push 以確保用戶接收。
-//            修正 carousel 最後一張卡片的尺寸以符合 LINE 規範。
 // 基於: 畫鬼腳 MVP v1.0
 // ============================================================
-// 
+//
 // v2.0 功能:
 // - 時段系統（Night→Day→Cooking→After Hours）
 // - 記憶即食材系統（關鍵詞捕捉→食材解鎖）
@@ -79,19 +77,6 @@
 // - 修改函數：getDay1CookingTea_Part1(state)、getDay1CookingSoup_Part1(state)
 //             getDay2CookingResult(state)、getDay2CookingResult_苦辛(state)
 //
-// V4.13 新增功能（2026-02-03）- LIFF 做飯小遊戲 API + 遺物圖片:
-//   - doGet() 新增 LIFF API 路由處理
-//   - getCookingStateForLiff(userId) - 返回玩家可用記憶
-//   - submitCookingFromLiff(userId, selectedMemories) - 處理料理提交
-//   - calculateEndingFromMemories(memories) - 從記憶計算結局
-//   - getDishNameByEnding(endingType) - 取得料理名稱
-//   - 遺物圖鑑卡片改用圖片（彎曲的針/泛黃照片/銀頂針）
-//   - createHeirloomCard() 支援 imageUrl 參數
-//
-// V4.12 新增功能（2026-02-03）- Day 3 告別場景 Hero 圖整合:
-//   - 告別場景根據結局類型顯示不同 Hero 圖（苦味/甜味/平衡）
-//   - 修復圖片緩存問題（day1_memory_hands_needle、day2_memory_promise 加上 ?v=2）
-//
 // V4.11 新增功能（2026-02-02）- Day 1-2 記憶碎片 Hero 圖整合:
 // - 視覺風格：Hollow Knight / Alto's Odyssey 美學
 // - 整合 11 張 Hero 圖到 Flex Card：
@@ -101,6 +86,23 @@
 // - 更新函數：getDay1HandsMemoryCard()、getDay2MemoryCard1/2/3()
 //             getDay2CookingResult_苦辛()、getDay2CookingResult_撫慰()
 // - 撫慰鹹粥記憶劇場：純文字改為帶 Hero 圖的 Flex Card
+//
+// V4.12 新增功能（2026-02-03）- Day 3 告別場景 Hero 圖整合:
+// - 告別場景根據結局類型顯示不同 Hero 圖（苦味/甜味/平衡）
+// - 修復圖片緩存問題（day1_memory_hands_needle、day2_memory_promise 加上 ?v=2）
+//
+// V4.13 新增功能（2026-02-03）- LIFF 做飯小遊戲 API + 遺物圖片:
+// - doGet() 新增 LIFF API 路由處理（action: getCookingState / submitCooking / pushCookingComplete）
+// - getCookingStateForLiff(userId) - 返回玩家可用記憶、當日可做料理、所需食材表
+// - submitCookingFromLiff(userId, selectedMemories) - 處理料理提交
+// - calculateEndingFromMemories(memories)、getDishNameByEnding(endingType)
+// - 遺物圖鑑卡片改用圖片（彎曲的針/泛黃照片/銀頂針），createHeirloomCard() 支援 imageUrl
+//
+// V4.14 新增功能（2026-02-05）- LIFF 體驗優化與顯示修復:
+// - **修復**：點擊料理沒反應（劇情照常往下走宛如沒有 LIFF）→ 料理階段正確顯示 LIFF 按鈕並導向小遊戲
+// - **MVP 擴增**：提示玩家要做的料理與所需食材（getCookingState 返回 availableRecipes、recipeRequirements，前端/訊息整合）
+// - **修復**：遺物圖鑑與突見（圖像）無法正確顯示 → Flex Card 結構含 imageUrl、回應改 push 確保送達
+// - **修復**：carousel 最後一張卡片尺寸以符合 LINE 規範（輪播內 bubble 同尺寸）
 // ============================================================
 
 // ============================================================
