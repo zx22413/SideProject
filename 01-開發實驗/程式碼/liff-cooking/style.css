@@ -305,6 +305,12 @@ body {
   margin-bottom: 1rem;
 }
 
+.complete-hint {
+  font-size: 0.9rem;
+  color: var(--color-text-dim);
+  margin-top: 1rem;
+}
+
 #result-dish {
   font-size: 1.2rem;
   margin-top: 1rem;

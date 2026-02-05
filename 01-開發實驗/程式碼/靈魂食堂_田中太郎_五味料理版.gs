@@ -180,6 +180,11 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     
+    // LIFF 料理提交：body 為 { userId, selectedMemories }，無 events
+    if (data.userId && Array.isArray(data.selectedMemories) && !data.events) {
+      return handleLiffSubmitCooking(data);
+    }
+    
     if (!data.events || data.events.length === 0) {
       return ContentService.createTextOutput(JSON.stringify({status: "ok"}))
         .setMimeType(ContentService.MimeType.JSON);
@@ -302,7 +307,7 @@ function getCookingStateForLiff(userId) {
 
 // ============================================================
 // LIFF API - POST 請求處理（料理提交）
-// 注意：需要在 doPost 中添加 LIFF 路由，或者使用獨立的 Web App
+// 依 currentDay 回傳當日料理名稱（Day 1 熱茶/熱湯、Day 2 三選一、Day 3 結局料理）
 // ============================================================
 function submitCookingFromLiff(userId, selectedMemories) {
   if (!userId || !selectedMemories || selectedMemories.length === 0) {
@@ -314,11 +319,8 @@ function submitCookingFromLiff(userId, selectedMemories) {
     return { error: 'User not found' };
   }
   
-  // 計算五味結局
   const endingType = calculateEndingFromMemories(selectedMemories);
-  
-  // 取得對應的料理名稱
-  const dishName = getDishNameByEnding(endingType);
+  const dishName = getDishNameForLiffSubmit(state.currentDay || 1, selectedMemories, endingType);
   
   return {
     success: true,
@@ -327,6 +329,26 @@ function submitCookingFromLiff(userId, selectedMemories) {
     endingType: endingType,
     dishName: dishName
   };
+}
+
+/**
+ * 依 currentDay 與選中的記憶回傳 LIFF 提交後的料理名稱
+ */
+function getDishNameForLiffSubmit(currentDay, selectedMemories, endingType) {
+  const sel = selectedMemories || [];
+  const has = (x) => sel.includes(x);
+  if (currentDay === 1) {
+    if (has("雨聲") || has("失憶") || has("迷茫")) return "熱湯";
+    if (has("寒冷") || has("針") || has("縫線") || (has("寧靜") && has("陪伴"))) return "熱茶";
+    return "熱茶"; // 預設
+  }
+  if (currentDay === 2) {
+    if (has("蜜糖笑容") && has("眼淚")) return "蜜汁燉菜";
+    if (has("執念") && (has("雪") || has("死亡"))) return "苦辛醒神湯";
+    if (has("寧靜") && has("陪伴")) return "撫慰鹹粥";
+    return "蜜汁燉菜"; // 預設
+  }
+  return getDishNameByEnding(endingType);
 }
 
 // ============================================================
@@ -397,6 +419,78 @@ function getDishNameByEnding(endingType) {
   }
 }
 
+/**
+ * doPost 內處理 LIFF 料理提交：更新玩家狀態並回傳 dishName
+ * LIFF 會再以 sendMessage 發「【料理完成】{dishName}」，由 handleMessage 推送後續劇情
+ */
+function handleLiffSubmitCooking(data) {
+  const result = submitCookingFromLiff(data.userId, data.selectedMemories);
+  if (result.error || !result.success) {
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  const userId = data.userId;
+  const state = getUserState(userId);
+  if (state) {
+    addDishCooked(userId, state, result.dishName);
+    // Day 3 不在此改 phase，留待使用者按「端出料理」時再改，其餘改為 AFTER
+    const currentDay = state.currentDay || 1;
+    if (currentDay !== 3) {
+      updateUserState(userId, {
+        phase: PHASE.AFTER,
+        lastActive: new Date().toISOString()
+      });
+    }
+  }
+  return ContentService.createTextOutput(JSON.stringify({
+    success: true,
+    dishName: result.dishName
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * 處理 LIFF 發送的「【料理完成】{dishName}」訊息，推送對應劇情（Day 1/2/3）
+ * @returns {boolean} 是否已處理
+ */
+function handleLiffCookingCompleteMessage(event, userId, state, dishName) {
+  const day = state.currentDay || 1;
+  showLoadingAnimation(userId, 5);
+  if (day === 1) {
+    if (dishName === "熱茶") {
+      addTopic(userId, state, "cooking_tea_part1");
+      replyMessage(event.replyToken, getDay1CookingTea_Part1(state));
+      return true;
+    }
+    if (dishName === "熱湯") {
+      addTopic(userId, state, "cooking_soup_part1");
+      replyMessage(event.replyToken, getDay1CookingSoup_Part1(state));
+      return true;
+    }
+  }
+  if (day === 2) {
+    if (dishName === "蜜汁燉菜") {
+      replyMessage(event.replyToken, getDay2CookingResult(state));
+      return true;
+    }
+    if (dishName === "苦辛醒神湯") {
+      replyMessage(event.replyToken, getDay2CookingResult_苦辛(state));
+      return true;
+    }
+    if (dishName === "撫慰鹹粥") {
+      addMemory(userId, state, "失語");
+      replyMessage(event.replyToken, getDay2CookingResult_撫慰());
+      return true;
+    }
+  }
+  if (day === 3 && (dishName === "糖霜幻景拼盤" || dishName === "千針冷骨湯" || dishName === "百味蜜汁炙燒魚")) {
+    addTopic(userId, state, "cooking_final_part1");
+    addTopic(userId, state, "cooking_final_part2");
+    replyMessage(event.replyToken, getDay3CookingProcess_Part2(state));
+    return true;
+  }
+  return false;
+}
+
 // ============================================================
 // LIFF 料理按鈕生成（用於整合到料理場景）
 // ============================================================
@@ -463,6 +557,17 @@ function handleMessage(event) {
     const statusMsg = `Day ${state.currentDay} - ${state.phase}\n收集的記憶: ${state.collectedMemories.length}個\n已完成話題: ${state.topicsDone.length}個`;
     replyMessage(event.replyToken, {type: "text", text: statusMsg});
     return;
+  }
+  
+  // ============================================================
+  // LIFF 料理完成訊息：由 LIFF sendMessage 發送，推送對應劇情
+  // ============================================================
+  if (userText.startsWith("【料理完成】")) {
+    const dishName = userText.replace("【料理完成】", "").trim();
+    if (dishName && state) {
+      const handled = handleLiffCookingCompleteMessage(event, userId, state, dishName);
+      if (handled) return;
+    }
   }
   
   // ============================================================
@@ -2030,6 +2135,14 @@ function handleDay1Cooking(event, userId, state, userText) {
     return;
   } 
   else if (userText === "做熱茶" || userText === "【做熱茶】" || userText.includes("熱茶")) {
+    if (shouldUseLiffCooking()) {
+      showLoadingAnimation(userId, 5);
+      replyMessage(event.replyToken, [
+        { type: "text", text: "請點擊上方「開始料理」按鈕開啟料理。" },
+        getDay1CookingScene(state)
+      ]);
+      return;
+    }
     const memories = state.collectedMemories || [];
     if (!getDay1AvailableRecipes(memories).includes("熱茶")) {
       showLoadingAnimation(userId, 5);
@@ -2064,6 +2177,14 @@ function handleDay1Cooking(event, userId, state, userText) {
     return;
   }
   else if (userText === "做熱湯" || userText === "【做熱湯】" || userText.includes("熱湯")) {
+    if (shouldUseLiffCooking()) {
+      showLoadingAnimation(userId, 5);
+      replyMessage(event.replyToken, [
+        { type: "text", text: "請點擊上方「開始料理」按鈕開啟料理。" },
+        getDay1CookingScene(state)
+      ]);
+      return;
+    }
     const memories = state.collectedMemories || [];
     if (!getDay1AvailableRecipes(memories).includes("熱湯")) {
       showLoadingAnimation(userId, 5);
@@ -2125,21 +2246,26 @@ function getDay1CookingScene(state) {
   }
   
   const footerContents = [];
-  if (recipes.includes("熱茶")) {
-    footerContents.push({
-      type: "button",
-      action: { type: "message", label: "☕ 做熱茶", text: "【做熱茶】" },
-      style: "primary",
-      color: "#FF6B6B"
-    });
-  }
-  if (recipes.includes("熱湯")) {
-    footerContents.push({
-      type: "button",
-      action: { type: "message", label: "🍜 做熱湯", text: "【做熱湯】" },
-      style: "primary",
-      color: "#4ECDC4"
-    });
+  if (shouldUseLiffCooking() && recipes.length > 0) {
+    const btn = getLiffCookingButton("🍳 開始料理");
+    if (btn) footerContents.push(btn);
+  } else {
+    if (recipes.includes("熱茶")) {
+      footerContents.push({
+        type: "button",
+        action: { type: "message", label: "☕ 做熱茶", text: "【做熱茶】" },
+        style: "primary",
+        color: "#FF6B6B"
+      });
+    }
+    if (recipes.includes("熱湯")) {
+      footerContents.push({
+        type: "button",
+        action: { type: "message", label: "🍜 做熱湯", text: "【做熱湯】" },
+        style: "primary",
+        color: "#4ECDC4"
+      });
+    }
   }
   if (footerContents.length === 0) {
     footerContents.push({
@@ -3879,6 +4005,14 @@ function handleDay2Cooking(event, userId, state, userText) {
     replyMessage(event.replyToken, getDay2CookingScene(state));
     return;
   } else if (userText.includes("蜜汁") || userText.includes("燉菜") || userText === "【做蜜汁燉菜】") {
+    if (shouldUseLiffCooking()) {
+      showLoadingAnimation(userId, 5);
+      replyMessage(event.replyToken, [
+        { type: "text", text: "請點擊上方「開始料理」按鈕開啟料理。" },
+        getDay2CookingScene(state)
+      ]);
+      return;
+    }
     const memories = state.collectedMemories || [];
     if (!getDay2AvailableRecipes(memories).includes("蜜汁燉菜")) {
       showLoadingAnimation(userId, 5);
@@ -3894,6 +4028,14 @@ function handleDay2Cooking(event, userId, state, userText) {
     replyMessage(event.replyToken, getDay2CookingResult(state));  // V4.10: 傳入 state
     return;
   } else if (userText.includes("苦辛") || userText.includes("醒神") || userText === "【做苦辛醒神湯】") {
+    if (shouldUseLiffCooking()) {
+      showLoadingAnimation(userId, 5);
+      replyMessage(event.replyToken, [
+        { type: "text", text: "請點擊上方「開始料理」按鈕開啟料理。" },
+        getDay2CookingScene(state)
+      ]);
+      return;
+    }
     const memories = state.collectedMemories || [];
     if (!getDay2AvailableRecipes(memories).includes("苦辛醒神湯")) {
       showLoadingAnimation(userId, 5);
@@ -3909,6 +4051,14 @@ function handleDay2Cooking(event, userId, state, userText) {
     replyMessage(event.replyToken, getDay2CookingResult_苦辛(state));  // V4.10: 傳入 state
     return;
   } else if (userText.includes("撫慰") || userText.includes("鹹粥") || userText === "【做撫慰鹹粥】") {
+    if (shouldUseLiffCooking()) {
+      showLoadingAnimation(userId, 5);
+      replyMessage(event.replyToken, [
+        { type: "text", text: "請點擊上方「開始料理」按鈕開啟料理。" },
+        getDay2CookingScene(state)
+      ]);
+      return;
+    }
     const memories = state.collectedMemories || [];
     if (!getDay2AvailableRecipes(memories).includes("撫慰鹹粥")) {
       showLoadingAnimation(userId, 5);
@@ -3960,7 +4110,10 @@ function getDay2CookingScene(state) {
   }
   
   const footerContents = [];
-  if (recipes.length > 0) {
+  if (shouldUseLiffCooking() && recipes.length > 0) {
+    const btn = getLiffCookingButton("🍳 開始料理");
+    if (btn) footerContents.push(btn);
+  } else if (recipes.length > 0) {
     if (recipes.includes("蜜汁燉菜")) {
       footerContents.push({
         type: "button",
@@ -4764,18 +4917,16 @@ function getDay3CookingStart(state) {
       footer: {
         type: "box",
         layout: "vertical",
-        contents: [
-          {
+        contents: (function() {
+          const liffBtn = getLiffCookingButton("🍳 開始料理");
+          if (shouldUseLiffCooking() && liffBtn) return [liffBtn];
+          return [{
             type: "button",
-            action: {
-              type: "message",
-              label: `${dishEmoji} 製作${dishName}`,
-              text: "【製作最終料理】"
-            },
+            action: { type: "message", label: `${dishEmoji} 製作${dishName}`, text: "【製作最終料理】" },
             style: "primary",
             color: dishColor
-          }
-        ]
+          }];
+        })()
       }
     }
   };
@@ -4788,6 +4939,14 @@ function handleDay3Cooking(event, userId, state, userText) {
   // 支援新舊料理名稱觸發（向下相容）
   if (userText.includes("最終料理") || userText.includes("製作") || userText === "【製作最終料理】" ||
       userText.includes("糖霜幻景拼盤") || userText.includes("千針冷骨湯") || userText.includes("百味蜜汁炙燒魚")) {
+    if (shouldUseLiffCooking()) {
+      showLoadingAnimation(userId, 5);
+      replyMessage(event.replyToken, [
+        { type: "text", text: "請點擊上方「開始料理」按鈕開啟料理。" },
+        getDay3CookingStart(state)
+      ]);
+      return;
+    }
     showLoadingAnimation(userId, 5);
     addTopic(userId, state, "cooking_final_part1");
     replyMessage(event.replyToken, getDay3CookingProcess_Part1(state)); // V4.9: 傳遞 state
