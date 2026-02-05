@@ -300,31 +300,12 @@ async function submitCooking() {
   showScreen('complete');
   elements.resultDish.textContent = result.dishName || '料理完成';
   
-  // 僅在成功且取得有效 dishName 時才發送回 LINE
+  // 一律使用 GAS pushCookingComplete API 推送劇情（不依賴 sendMessages/webhook）
+  // 原因：isInClient 在部分環境為 false（外部瀏覽器、LINE In-App Browser），sendMessages 可能失敗或不可用
   const isInClient = !!liff.isInClient();
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'before sendMessages',data:{isInClient,dishName:result.dishName,willSend:isInClient&&!!result.dishName},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-  // #endregion
-  if (isInClient && result.dishName) {
-    try {
-      await liff.sendMessages([{
-        type: 'text',
-        text: `【料理完成】${result.dishName}`
-      }]);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'sendMessages success',data:{dishName:result.dishName},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2'})}).catch(()=>{});
-      // #endregion
-    } catch (sendErr) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'sendMessages failed',data:{error:String(sendErr),dishName:result.dishName},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
-      console.error('liff.sendMessages 失敗:', sendErr);
-      showCatDialogue('「無法傳送料理結果…請確認在 LINE 內開啟，並稍後再試。」');
-      return;
-    }
-  } else if (isInClient && !result.dishName) {
+  if (!result.dishName) {
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'branch no dishName',data:{success:result.success,dishName:result.dishName,fullResult:result},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'branch no dishName',data:{success:result.success,dishName:result.dishName},timestamp:Date.now(),sessionId:'debug-session'})}).catch(()=>{});
     // #endregion
     console.warn('submitCooking 未回傳 dishName:', result);
     showScreen('cooking');
@@ -332,26 +313,29 @@ async function submitCooking() {
     elements.btnCook.disabled = false;
     elements.btnCook.textContent = '完成料理';
     return;
-  } else if (!isInClient && result.dishName) {
-    // isInClient=false（外部瀏覽器或 LINE 環境異常），無法 sendMessages，改呼叫 GAS API 主動推送劇情
-    try {
-      const pushUrl = `${CONFIG.GAS_API_URL}?action=pushCookingComplete&userId=${encodeURIComponent(state.userId)}&dishName=${encodeURIComponent(result.dishName)}`;
-      const pushRes = await fetch(pushUrl);
-      const pushData = await pushRes.json().catch(() => ({}));
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'pushCookingComplete fallback',data:{success:pushData.success,dishName:result.dishName,error:pushData.error},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H5'})}).catch(()=>{});
-      // #endregion
-      if (!pushData.success) {
-        console.warn('pushCookingComplete 失敗:', pushData);
-      } else {
-        showCatDialogue('「料理完成了。請回到 LINE 聊天室查看後續劇情。」');
-      }
-    } catch (pushErr) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'pushCookingComplete error',data:{error:String(pushErr)},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'H5'})}).catch(()=>{});
-      // #endregion
-      console.error('pushCookingComplete 請求失敗:', pushErr);
+  }
+  try {
+    const pushUrl = `${CONFIG.GAS_API_URL}?action=pushCookingComplete&userId=${encodeURIComponent(state.userId)}&dishName=${encodeURIComponent(result.dishName)}`;
+    const pushRes = await fetch(pushUrl);
+    const pushData = await pushRes.json().catch(() => ({}));
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'pushCookingComplete',data:{success:pushData.success,dishName:result.dishName,error:pushData.error,isInClient},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix'})}).catch(()=>{});
+    // #endregion
+    if (!pushData.success) {
+      console.warn('pushCookingComplete 失敗:', pushData);
+      showCatDialogue('「推送劇情時發生問題…請稍後再試。」');
+      return;
     }
+    if (!isInClient) {
+      showCatDialogue('「料理完成了。請回到 LINE 聊天室查看後續劇情。」');
+    }
+  } catch (pushErr) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'pushCookingComplete error',data:{error:String(pushErr)},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix'})}).catch(()=>{});
+    // #endregion
+    console.error('pushCookingComplete 請求失敗:', pushErr);
+    showCatDialogue('「無法連線…請確認網路後再試。」');
+    return;
   }
   
   // 關閉 LIFF（isInClient 時）或提示回到 LINE
