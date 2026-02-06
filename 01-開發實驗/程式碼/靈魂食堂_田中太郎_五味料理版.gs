@@ -1,8 +1,8 @@
 // ============================================================
 // 靈魂食堂 - 田中太郎重構版（神秘感優先）
-// 版本: V4.14 (優化 LIFF 體驗)
+// 版本: V4.15 (劇本擴充設計討論)
 // 創建日期: 2026-01-20
-// 最後更新: 2026-02-05
+// 最後更新: 2026-02-06
 // 基於: 畫鬼腳 MVP v1.0
 // ============================================================
 //
@@ -103,6 +103,11 @@
 // - **MVP 擴增**：提示玩家要做的料理與所需食材（getCookingState 返回 availableRecipes、recipeRequirements，前端/訊息整合）
 // - **修復**：遺物圖鑑與突見（圖像）無法正確顯示 → Flex Card 結構含 imageUrl、回應改 push 確保送達
 // - **修復**：carousel 最後一張卡片尺寸以符合 LINE 規範（輪播內 bubble 同尺寸）
+//
+// V4.15（2026-02-06）- 劇本擴充設計討論:
+// - 檔頭版本號與版本說明區塊更新；今日以劇本擴充設計原則與 Skill 撰寫為主。
+// - **修復**：對話表介面 — getDialogueFromSheet 使用未定義常數 DIALOGUE_SHEET_NAME 導致執行錯誤；
+//   改為正確定義 const DIALOGUE_SHEET_NAME = "對話表"，與 對話表_佈署說明.md、對話表_第一版範例.csv 對齊。
 // ============================================================
 
 // ============================================================
@@ -1324,6 +1329,91 @@ function pushMessages(userId, messages) {
 }
 
 // ============================================================
+// 對話表（從試算表「對話表」讀取擴充台詞）
+// ============================================================
+/** 試算表內對話表工作表名稱，須與實際 Sheet 名稱一致 */
+const DIALOGUE_SHEET_NAME = "dialogue";
+
+/**
+ * 從「對話表」工作表依 id 取得一筆對話
+ * @param {string} id - 對話唯一鍵（如 day1_after_strange）
+ * @returns {{ text: string, quickReply?: object, next_id?: string, speaker?: string } | null}
+ */
+function getDialogueFromSheet(id) {
+  if (!SPREADSHEET_ID || !id) return null;
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(DIALOGUE_SHEET_NAME);  // 與 對話表_佈署說明.md、對話表_第一版範例.csv 對應
+    if (!sheet) return null;
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return null;
+    const header = data[0];
+    const idCol = header.indexOf("id");
+    const textCol = header.indexOf("text");
+    const qrCol = header.indexOf("quick_reply");
+    const nextCol = header.indexOf("next_id");
+    const speakerCol = header.indexOf("speaker");
+    if (idCol < 0 || textCol < 0) return null;
+    for (var i = 1; i < data.length; i++) {
+      var rowId = (data[i][idCol] != null) ? String(data[i][idCol]).trim() : "";
+      if (rowId === id) {
+        var text = (data[i][textCol] != null) ? String(data[i][textCol]) : "";
+        var quickReply = undefined;
+        if (qrCol >= 0 && data[i][qrCol]) {
+          var raw = String(data[i][qrCol]).trim();
+          if (raw) {
+            var items = raw.split(";").map(function(s) {
+              var parts = s.split("|");
+              return { label: (parts[0] || "").trim(), text: (parts[1] || "").trim() };
+            }).filter(function(x) { return x.label || x.text; });
+            if (items.length > 0) {
+              quickReply = {
+                items: items.map(function(it) {
+                  return { type: "action", action: { type: "message", label: it.label, text: it.text } };
+                })
+              };
+            }
+          }
+        }
+        var nextId = (nextCol >= 0 && data[i][nextCol]) ? String(data[i][nextCol]).trim() : "";
+        var speaker = (speakerCol >= 0 && data[i][speakerCol]) ? String(data[i][speakerCol]).trim() : "";
+        return { text: text, quickReply: quickReply, next_id: nextId || undefined, speaker: speaker || undefined };
+      }
+    }
+    return null;
+  } catch (e) {
+    Logger.log("getDialogueFromSheet error: " + e);
+    return null;
+  }
+}
+
+/**
+ * 依 next_id 串成一段對話序列，回傳 LINE 訊息物件陣列（最多 maxCount 則）
+ * @param {string} startId - 起始 id
+ * @param {number} maxCount - 最多幾則（預設 4，留一則給結尾用）
+ * @returns {Array<{ type: string, text: string, quickReply?: object }>}
+ */
+function getDialogueSequenceFromSheet(startId, maxCount) {
+  var out = [];
+  var count = (maxCount != null && maxCount >= 0) ? maxCount : 4;
+  var currentId = startId;
+  var seen = {};
+  while (count > 0 && currentId && !seen[currentId]) {
+    seen[currentId] = true;
+    var row = getDialogueFromSheet(currentId);
+    if (!row || !row.text) break;
+    var displayText = row.text;
+    if (row.speaker) displayText = "【" + row.speaker + "】\n\n" + displayText;
+    var msg = { type: "text", text: displayText };
+    if (row.quickReply) msg.quickReply = row.quickReply;
+    out.push(msg);
+    count--;
+    currentId = row.next_id || "";
+  }
+  return out;
+}
+
+// ============================================================
 // Loading Animation（顯示「打字中」動畫）
 // ============================================================
 function showLoadingAnimation(chatId, seconds = 5) {
@@ -2542,9 +2632,10 @@ function handleDay1After(event, userId, state, userText) {
     return;
   }
   
-  // 預設回應
+  // 預設回應：先送對話表 Day 1 After 擴充（若有），再接「今天就到這吧。明天再說。」
   showLoadingAnimation(userId, 5);
-  replyMessage(event.replyToken, {
+  var day1AfterMessages = getDialogueSequenceFromSheet("day1_after_strange", 4);
+  var closingMsg = {
     type: "text",
     text: "【黑貓打哈欠】\n\n「今天就到這吧。明天再說。」",
     quickReply: {
@@ -2559,7 +2650,13 @@ function handleDay1After(event, userId, state, userText) {
         }
       ]
     }
-  });
+  };
+  if (day1AfterMessages && day1AfterMessages.length > 0) {
+    day1AfterMessages.push(closingMsg);
+    replyMessage(event.replyToken, day1AfterMessages);
+  } else {
+    replyMessage(event.replyToken, closingMsg);
+  }
 }
 
 // Day 1 Cooking Tea - Part 1（烹飪過程）- 最多 5 條消息
