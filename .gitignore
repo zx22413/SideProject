@@ -16,9 +16,6 @@
 # 歸檔版本（可能包含舊版硬編碼的 Token，不需要同步）
 **/archive-versions/*.gs
 
-# CSV 測試資料（可能包含用戶資訊）
-**/*程式碼/*.csv
-
 # Environment variables
 .env
 .env.local

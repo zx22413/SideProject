@@ -1,8 +1,8 @@
 // ============================================================
 // 靈魂食堂 - 田中太郎重構版（神秘感優先）
-// 版本: V4.15 (劇本擴充設計討論)
+// 版本: V4.15 (Dialogue 擴增劇本系統)
 // 創建日期: 2026-01-20
-// 最後更新: 2026-02-06
+// 最後更新: 2026-02-07
 // 基於: 畫鬼腳 MVP v1.0
 // ============================================================
 //
@@ -104,10 +104,17 @@
 // - **修復**：遺物圖鑑與突見（圖像）無法正確顯示 → Flex Card 結構含 imageUrl、回應改 push 確保送達
 // - **修復**：carousel 最後一張卡片尺寸以符合 LINE 規範（輪播內 bubble 同尺寸）
 //
-// V4.15（2026-02-06）- 劇本擴充設計討論:
-// - 檔頭版本號與版本說明區塊更新；今日以劇本擴充設計原則與 Skill 撰寫為主。
-// - **修復**：對話表介面 — getDialogueFromSheet 使用未定義常數 DIALOGUE_SHEET_NAME 導致執行錯誤；
-//   改為正確定義 const DIALOGUE_SHEET_NAME = "對話表"，與 對話表_佈署說明.md、對話表_第一版範例.csv 對齊。
+// V4.15 新增功能（2026-02-07）- Dialogue 擴增劇本系統:
+// - **新增 dialogue 工作表**：與 userStateTanaka 同試算表，節點式結構（block_id, seq, system_msg, quick_reply, next_seq）
+// - **Day 1→Day 2 過渡段**：Day 1 After 結束直接接入 seq 1，玩家依 quickReply 推進，支援跳過選項
+// - **換行**：system_msg 中 `\n`、`¥n` 轉成實際換行（Excel 反斜線若在 LINE 顯示為 ¥ 會自動處理）
+// - **分則訊息（做法 A）**：system_msg 含 `|||` 時拆成多則訊息送出，最後一則帶 quickReply
+// - 新增函數：getDialogueNode、hasDialogueBlock、getTransitionCurrentSeq、getDialogueNextSeq、dialogueNodeToMessage、applyDialogueSeq1ToLastMessage
+//
+// Google Sheets 需求（新增）:
+// - Sheet 名稱: "dialogue"（可選，不存在則回退硬編碼流程）
+// - 欄位: block_id | seq | system_msg | quick_reply | next_seq | note
+//
 // ============================================================
 
 // ============================================================
@@ -1141,6 +1148,166 @@ function addTopic(userId, state, topic) {
   }
 }
 
+// ============================================================
+// Dialogue 擴增劇本系統（從 dialogue 工作表讀取）
+// ============================================================
+const DIALOGUE_SHEET_NAME = "dialogue";
+const DIALOGUE_BLOCK_TRANSITION = "day1_to_day2_transition";
+
+/**
+ * 從 dialogue 工作表取得指定 block 的對話節點
+ * @param {string} blockId - 如 "day1_to_day2_transition"
+ * @param {number} seq - 節點序號
+ * @returns {{ systemMsg: string, quickReply: object, options: Array<{label:string,text:string}>, nextSeqs: number[] } | null}
+ */
+function getDialogueNode(blockId, seq) {
+  if (!SPREADSHEET_ID) return null;
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(DIALOGUE_SHEET_NAME);
+    if (!sheet) return null;
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return null;
+    const header = data[0];
+    const blockCol = header.indexOf("block_id") >= 0 ? header.indexOf("block_id") : 0;
+    const seqCol = header.indexOf("seq") >= 0 ? header.indexOf("seq") : 1;
+    const msgCol = header.indexOf("system_msg") >= 0 ? header.indexOf("system_msg") : 2;
+    const qrCol = header.indexOf("quick_reply") >= 0 ? header.indexOf("quick_reply") : 3;
+    const nextCol = header.indexOf("next_seq") >= 0 ? header.indexOf("next_seq") : 4;
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const rowBlock = String(row[blockCol] || "").trim();
+      const rowSeq = parseInt(row[seqCol], 10);
+      if (rowBlock === blockId && rowSeq === seq) {
+        let systemMsg = (row[msgCol] != null) ? String(row[msgCol]).trim() : "";
+        // 將試算表中的 \n、¥n（反斜線在 LINE 顯示為 ¥）轉成實際換行
+        systemMsg = systemMsg.replace(/\\n/g, "\n").replace(/\u00A5n/g, "\n").replace(/¥n/g, "\n");
+        const qrRaw = (row[qrCol] != null) ? String(row[qrCol]).trim() : "";
+        const nextSeqRaw = (row[nextCol] != null) ? String(row[nextCol]).trim() : "";
+        const options = [];
+        const items = qrRaw ? qrRaw.split(";") : [];
+        items.forEach(function(pair) {
+          const parts = pair.split("|");
+          const label = (parts[0] || "").trim();
+          const text = (parts[1] || label).trim();
+          if (label || text) options.push({ label: label, text: text });
+        });
+        const nextSeqs = [];
+        if (nextSeqRaw) {
+          nextSeqRaw.split(",").forEach(function(s) {
+            const n = parseInt(s.trim(), 10);
+            if (!isNaN(n)) nextSeqs.push(n);
+          });
+        }
+        const quickReplyItems = options.map(function(o) {
+          return {
+            type: "action",
+            action: { type: "message", label: o.label, text: o.text }
+          };
+        });
+        return {
+          systemMsg: systemMsg,
+          quickReply: quickReplyItems.length > 0 ? { items: quickReplyItems } : undefined,
+          options: options,
+          nextSeqs: nextSeqs.length > 0 ? nextSeqs : []
+        };
+      }
+    }
+    return null;
+  } catch (e) {
+    Logger.log("getDialogueNode error: " + e);
+    return null;
+  }
+}
+
+/**
+ * 檢查 dialogue block 是否有任一節點（用於判斷是否啟用過渡段）
+ */
+function hasDialogueBlock(blockId) {
+  return getDialogueNode(blockId, 1) !== null;
+}
+
+/**
+ * 從 topicsDone 取得過渡段當前 seq（最大 transition_expand_N）
+ */
+function getTransitionCurrentSeq(topicsDone) {
+  if (!topicsDone || !Array.isArray(topicsDone)) return 0;
+  let maxSeq = 0;
+  topicsDone.forEach(function(t) {
+    const m = String(t).match(/^transition_expand_(\d+)$/);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n > maxSeq) maxSeq = n;
+    }
+  });
+  return maxSeq;
+}
+
+/**
+ * 依 userText 取得下一 seq，若為「明天繼續」則回傳 "advance_day2"
+ * @param {string} blockId
+ * @param {number} currentSeq
+ * @param {string} userText
+ * @returns {number|"advance_day2"|null}
+ */
+function getDialogueNextSeq(blockId, currentSeq, userText) {
+  const norm = function(s) { return String(s || "").trim(); };
+  const isTomorrow = norm(userText) === "【明天繼續】" || norm(userText) === "明天繼續" || norm(userText) === "明天";
+  if (isTomorrow) return "advance_day2";
+  const node = getDialogueNode(blockId, currentSeq);
+  if (!node || !node.options || node.options.length === 0) return null;
+  let matchedIdx = -1;
+  for (let i = 0; i < node.options.length; i++) {
+    if (norm(node.options[i].text) === norm(userText)) {
+      matchedIdx = i;
+      break;
+    }
+  }
+  if (matchedIdx < 0) return null;
+  const nextSeqs = node.nextSeqs;
+  if (!nextSeqs.length) return null;
+  const nextSeq = nextSeqs.length > 1 ? (nextSeqs[matchedIdx] != null ? nextSeqs[matchedIdx] : nextSeqs[0]) : nextSeqs[0];
+  return nextSeq;
+}
+
+/**
+ * 將 dialogue 節點轉成 LINE 訊息物件（單則或多則）
+ * 做法 A：system_msg 若含 ||| 則拆成多則訊息送出，最後一則帶 quickReply
+ */
+function dialogueNodeToMessage(node) {
+  if (!node) return null;
+  const raw = node.systemMsg || "";
+  const parts = raw.split("|||").map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+  if (parts.length <= 1) {
+    return {
+      type: "text",
+      text: raw,
+      quickReply: node.quickReply
+    };
+  }
+  const msgs = parts.map(function(text, i) {
+    const isLast = i === parts.length - 1;
+    return {
+      type: "text",
+      text: text,
+      quickReply: isLast ? node.quickReply : undefined
+    };
+  });
+  return msgs;
+}
+
+/** 型塑 Day 1 After 最後一則訊息的 quickReply 為 dialogue seq 1（若存在） */
+function applyDialogueSeq1ToLastMessage(messages) {
+  if (!messages || !messages.length) return messages;
+  const node = getDialogueNode(DIALOGUE_BLOCK_TRANSITION, 1);
+  if (!node || !node.quickReply) return messages;
+  const last = messages[messages.length - 1];
+  if (last && typeof last === "object" && last.type === "text") {
+    last.quickReply = node.quickReply;
+  }
+  return messages;
+}
+
 /** 記錄本輪做過的料理（Day 1-2）。用於 Day 3 結局額外台詞和五味計算。 */
 function addDishCooked(userId, state, dish) {
   const list = state.dishesCooked || [];
@@ -1326,91 +1493,6 @@ function pushMessages(userId, messages) {
   } catch (error) {
     Logger.log("Push 訊息失敗: " + error);
   }
-}
-
-// ============================================================
-// 對話表（從試算表「對話表」讀取擴充台詞）
-// ============================================================
-/** 試算表內對話表工作表名稱，須與實際 Sheet 名稱一致 */
-const DIALOGUE_SHEET_NAME = "dialogue";
-
-/**
- * 從「對話表」工作表依 id 取得一筆對話
- * @param {string} id - 對話唯一鍵（如 day1_after_strange）
- * @returns {{ text: string, quickReply?: object, next_id?: string, speaker?: string } | null}
- */
-function getDialogueFromSheet(id) {
-  if (!SPREADSHEET_ID || !id) return null;
-  try {
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheet = ss.getSheetByName(DIALOGUE_SHEET_NAME);  // 與 對話表_佈署說明.md、對話表_第一版範例.csv 對應
-    if (!sheet) return null;
-    const data = sheet.getDataRange().getValues();
-    if (data.length < 2) return null;
-    const header = data[0];
-    const idCol = header.indexOf("id");
-    const textCol = header.indexOf("text");
-    const qrCol = header.indexOf("quick_reply");
-    const nextCol = header.indexOf("next_id");
-    const speakerCol = header.indexOf("speaker");
-    if (idCol < 0 || textCol < 0) return null;
-    for (var i = 1; i < data.length; i++) {
-      var rowId = (data[i][idCol] != null) ? String(data[i][idCol]).trim() : "";
-      if (rowId === id) {
-        var text = (data[i][textCol] != null) ? String(data[i][textCol]) : "";
-        var quickReply = undefined;
-        if (qrCol >= 0 && data[i][qrCol]) {
-          var raw = String(data[i][qrCol]).trim();
-          if (raw) {
-            var items = raw.split(";").map(function(s) {
-              var parts = s.split("|");
-              return { label: (parts[0] || "").trim(), text: (parts[1] || "").trim() };
-            }).filter(function(x) { return x.label || x.text; });
-            if (items.length > 0) {
-              quickReply = {
-                items: items.map(function(it) {
-                  return { type: "action", action: { type: "message", label: it.label, text: it.text } };
-                })
-              };
-            }
-          }
-        }
-        var nextId = (nextCol >= 0 && data[i][nextCol]) ? String(data[i][nextCol]).trim() : "";
-        var speaker = (speakerCol >= 0 && data[i][speakerCol]) ? String(data[i][speakerCol]).trim() : "";
-        return { text: text, quickReply: quickReply, next_id: nextId || undefined, speaker: speaker || undefined };
-      }
-    }
-    return null;
-  } catch (e) {
-    Logger.log("getDialogueFromSheet error: " + e);
-    return null;
-  }
-}
-
-/**
- * 依 next_id 串成一段對話序列，回傳 LINE 訊息物件陣列（最多 maxCount 則）
- * @param {string} startId - 起始 id
- * @param {number} maxCount - 最多幾則（預設 4，留一則給結尾用）
- * @returns {Array<{ type: string, text: string, quickReply?: object }>}
- */
-function getDialogueSequenceFromSheet(startId, maxCount) {
-  var out = [];
-  var count = (maxCount != null && maxCount >= 0) ? maxCount : 4;
-  var currentId = startId;
-  var seen = {};
-  while (count > 0 && currentId && !seen[currentId]) {
-    seen[currentId] = true;
-    var row = getDialogueFromSheet(currentId);
-    if (!row || !row.text) break;
-    var displayText = row.text;
-    if (row.speaker) displayText = "【" + row.speaker + "】\n\n" + displayText;
-    var msg = { type: "text", text: displayText };
-    if (row.quickReply) msg.quickReply = row.quickReply;
-    out.push(msg);
-    count--;
-    currentId = row.next_id || "";
-  }
-  return out;
 }
 
 // ============================================================
@@ -2606,18 +2688,55 @@ function handleDay1After(event, userId, state, userText) {
     addTopic(userId, state, "cooking_tea_part3");
     addDishCooked(userId, state, "熱茶");
     updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-    replyMessage(event.replyToken, getDay1CookingTea_Part3());
+    let msgs = getDay1CookingTea_Part3();
+    if (hasDialogueBlock(DIALOGUE_BLOCK_TRANSITION)) {
+      msgs = applyDialogueSeq1ToLastMessage(msgs);
+      addTopic(userId, state, "transition_expand_1");
+    }
+    replyMessage(event.replyToken, msgs);
     return;
   }
   if (userText === "【繼續】" && topicsDone.includes("cooking_soup_part1") && !topicsDone.includes("cooking_soup_part2")) {
     showLoadingAnimation(userId, 5);
     addTopic(userId, state, "cooking_soup_part2");
     updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-    replyMessage(event.replyToken, getDay1CookingSoup_Part2());
+    let msgs = getDay1CookingSoup_Part2();
+    if (hasDialogueBlock(DIALOGUE_BLOCK_TRANSITION)) {
+      msgs = applyDialogueSeq1ToLastMessage(msgs);
+      addTopic(userId, state, "transition_expand_1");
+    }
+    replyMessage(event.replyToken, msgs);
     return;
   }
+
+  // 過渡段進行中：依 userText 推進 seq 或 明天繼續 推進 Day 2
+  const currentTransitionSeq = getTransitionCurrentSeq(topicsDone);
+  if (currentTransitionSeq > 0 && hasDialogueBlock(DIALOGUE_BLOCK_TRANSITION)) {
+    const next = getDialogueNextSeq(DIALOGUE_BLOCK_TRANSITION, currentTransitionSeq, userText);
+    if (next === "advance_day2") {
+      showLoadingAnimation(userId, 5);
+      updateUserState(userId, {
+        currentDay: 2,
+        phase: PHASE.DAY,
+        lastActive: new Date().toISOString()
+      });
+      const updatedState = getUserState(userId);
+      replyMessage(event.replyToken, getDay2DayShift(updatedState));
+      return;
+    }
+    if (typeof next === "number" && next > 0) {
+      const nextNode = getDialogueNode(DIALOGUE_BLOCK_TRANSITION, next);
+      if (nextNode) {
+        showLoadingAnimation(userId, 5);
+        addTopic(userId, state, "transition_expand_" + next);
+        const msg = dialogueNodeToMessage(nextNode);
+        if (msg) replyMessage(event.replyToken, msg);
+        return;
+      }
+    }
+  }
   
-  // 處理「明天繼續」
+  // 處理「明天繼續」（無 dialogue 或不在過渡段時）
   if (userText === "【明天繼續】" || userText === "明天繼續" || userText === "明天") {
     showLoadingAnimation(userId, 5);
     // 推進到 Day 2
@@ -2632,10 +2751,9 @@ function handleDay1After(event, userId, state, userText) {
     return;
   }
   
-  // 預設回應：先送對話表 Day 1 After 擴充（若有），再接「今天就到這吧。明天再說。」
+  // 預設回應
   showLoadingAnimation(userId, 5);
-  var day1AfterMessages = getDialogueSequenceFromSheet("day1_after_strange", 4);
-  var closingMsg = {
+  replyMessage(event.replyToken, {
     type: "text",
     text: "【黑貓打哈欠】\n\n「今天就到這吧。明天再說。」",
     quickReply: {
@@ -2650,13 +2768,7 @@ function handleDay1After(event, userId, state, userText) {
         }
       ]
     }
-  };
-  if (day1AfterMessages && day1AfterMessages.length > 0) {
-    day1AfterMessages.push(closingMsg);
-    replyMessage(event.replyToken, day1AfterMessages);
-  } else {
-    replyMessage(event.replyToken, closingMsg);
-  }
+  });
 }
 
 // Day 1 Cooking Tea - Part 1（烹飪過程）- 最多 5 條消息

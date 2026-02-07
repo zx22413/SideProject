@@ -1,0 +1,12 @@
+block_id,seq,system_msg,quick_reply,next_seq,note
+day1_to_day2_transition,1,,"你還好嗎?|你還好嗎?看你覺得很疑惑;明天繼續|【明天繼續】",2,seq1 僅提供 quickReply 取代 Day1 結尾按鈕；跳過選項
+day1_to_day2_transition,2,這裡...真的是食堂嗎？\n我總覺得...這裡有點奇怪。,哪裡奇怪?|哪裡奇怪?,3,
+day1_to_day2_transition,3,【老人】\n窗外什麼都沒有。只有雨。\n就好像...這裡不在任何地方。,繼續|【繼續】,4,
+day1_to_day2_transition,4,【黑貓】\n行了，差不多了。\n讓他去睡吧。,繼續|【繼續】,5,
+day1_to_day2_transition,5,【老人】\n但...我住在哪裡？,繼續|【繼續】,6,
+day1_to_day2_transition,6,【黑貓】\n樓上。\n隨便找個房間，都空著。\n明天再聊，今天夠了。,"他...會想起來嗎?|他...會想起來嗎?他看起來很恍惚",7,
+day1_to_day2_transition,7,【黑貓】\n看情況吧。\n有的人想得快，有的人慢。\n這老頭...應該還要幾天。,"如果想起來了...然後呢?|如果想起來了...然後呢?",8,
+day1_to_day2_transition,8,【黑貓】\n然後就走了。,"然後呢?|然後呢?;走?去哪裡?|走?去哪裡?",9,多選同出口
+day1_to_day2_transition,9,【黑貓】\n不知道。\n反正不在這裡。,...|那我呢?,10,
+day1_to_day2_transition,10,【黑貓】\n你？\n你是店裡的主廚啊。\n哪裡都不去。\n至少暫時是這樣。,"...|那我呢?;明天繼續|【明天繼續】",11,跳過選項；那我呢?->11 明天繼續->advance
+day1_to_day2_transition,11,【黑貓】\n就在這。明天再說。,明天繼續|【明天繼續】,,最後一則
