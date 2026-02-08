@@ -545,16 +545,40 @@ function handleLiffCookingCompleteMessage(event, userId, state, dishName) {
   }
   if (day === 2) {
     if (dishName === "蜜汁燉菜") {
-      replyMessage(event.replyToken, getDay2CookingResult(state));
+      addDishCooked(userId, state, "蜜汁燉菜");
+      updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
+      let msgs = getDay2CookingResult(state);
+      const blockId = getDay2AfterBlockId(state.dishesCooked || []);
+      if (blockId && hasDialogueBlock(blockId)) {
+        addTopic(userId, state, blockId + "_1");
+        msgs = applyDay2AfterDialogueSeq1(msgs, blockId);
+      }
+      replyMessage(event.replyToken, msgs);
       return true;
     }
     if (dishName === "苦辛醒神湯") {
-      replyMessage(event.replyToken, getDay2CookingResult_苦辛(state));
+      addDishCooked(userId, state, "苦辛醒神湯");
+      updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
+      let msgsB = getDay2CookingResult_苦辛(state);
+      const blockIdB = getDay2AfterBlockId(state.dishesCooked || []);
+      if (blockIdB && hasDialogueBlock(blockIdB)) {
+        addTopic(userId, state, blockIdB + "_1");
+        msgsB = applyDay2AfterDialogueSeq1(msgsB, blockIdB);
+      }
+      replyMessage(event.replyToken, msgsB);
       return true;
     }
     if (dishName === "撫慰鹹粥") {
       addMemory(userId, state, "失語");
-      replyMessage(event.replyToken, getDay2CookingResult_撫慰());
+      addDishCooked(userId, state, "撫慰鹹粥");
+      updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
+      let msgsS = getDay2CookingResult_撫慰();
+      const blockIdS = getDay2AfterBlockId(state.dishesCooked || []);
+      if (blockIdS && hasDialogueBlock(blockIdS)) {
+        addTopic(userId, state, blockIdS + "_1");
+        msgsS = applyDay2AfterDialogueSeq1(msgsS, blockIdS);
+      }
+      replyMessage(event.replyToken, msgsS);
       return true;
     }
   }
@@ -593,16 +617,40 @@ function pushLiffCookingCompleteStoryline(userId, dishName) {
   }
   if (day === 2) {
     if (dishName === "蜜汁燉菜") {
-      pushMessages(userId, getDay2CookingResult(state));
+      addDishCooked(userId, state, "蜜汁燉菜");
+      updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
+      let msgs = getDay2CookingResult(state);
+      const blockId = getDay2AfterBlockId(state.dishesCooked || []);
+      if (blockId && hasDialogueBlock(blockId)) {
+        addTopic(userId, state, blockId + "_1");
+        msgs = applyDay2AfterDialogueSeq1(msgs, blockId);
+      }
+      pushMessages(userId, msgs);
       return { success: true };
     }
     if (dishName === "苦辛醒神湯") {
-      pushMessages(userId, getDay2CookingResult_苦辛(state));
+      addDishCooked(userId, state, "苦辛醒神湯");
+      updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
+      let msgsB = getDay2CookingResult_苦辛(state);
+      const blockIdB = getDay2AfterBlockId(state.dishesCooked || []);
+      if (blockIdB && hasDialogueBlock(blockIdB)) {
+        addTopic(userId, state, blockIdB + "_1");
+        msgsB = applyDay2AfterDialogueSeq1(msgsB, blockIdB);
+      }
+      pushMessages(userId, msgsB);
       return { success: true };
     }
     if (dishName === "撫慰鹹粥") {
       addMemory(userId, state, "失語");
-      pushMessages(userId, getDay2CookingResult_撫慰());
+      addDishCooked(userId, state, "撫慰鹹粥");
+      updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
+      let msgsS = getDay2CookingResult_撫慰();
+      const blockIdS = getDay2AfterBlockId(state.dishesCooked || []);
+      if (blockIdS && hasDialogueBlock(blockIdS)) {
+        addTopic(userId, state, blockIdS + "_1");
+        msgsS = applyDay2AfterDialogueSeq1(msgsS, blockIdS);
+      }
+      pushMessages(userId, msgsS);
       return { success: true };
     }
   }
@@ -667,7 +715,7 @@ function handleMessage(event) {
   let state = getUserState(userId);
   
   // 特殊指令
-  if (userText === "重新開始" || userText === "restart") {
+  if (userText === "重新開始" || userText === "restart"|| userText === "遊戲開始") {
     resetUser(userId);
     replyMessage(event.replyToken, getOpening());
     return;
@@ -1153,6 +1201,10 @@ function addTopic(userId, state, topic) {
 // ============================================================
 const DIALOGUE_SHEET_NAME = "dialogue";
 const DIALOGUE_BLOCK_TRANSITION = "day1_to_day2_transition";
+const DIALOGUE_BLOCK_DAY2_AFTER_HONEY = "day2_after_honey";
+const DIALOGUE_BLOCK_DAY2_AFTER_BITTER = "day2_after_bitter";
+const DIALOGUE_BLOCK_DAY2_AFTER_SALTY = "day2_after_salty";
+const DIALOGUE_BLOCK_DAY2_TO_DAY3 = "day2_to_day3_transition";
 
 /**
  * 從 dialogue 工作表取得指定 block 的對話節點
@@ -1244,16 +1296,94 @@ function getTransitionCurrentSeq(topicsDone) {
 }
 
 /**
- * 依 userText 取得下一 seq，若為「明天繼續」則回傳 "advance_day2"
+ * 依 dishesCooked 取得 Day 2 After 對應的 dialogue block_id
+ * @param {string[]} dishesCooked
+ * @returns {string|null}
+ */
+function getDay2AfterBlockId(dishesCooked) {
+  if (!dishesCooked || !Array.isArray(dishesCooked)) return null;
+  if (dishesCooked.includes("蜜汁燉菜")) return DIALOGUE_BLOCK_DAY2_AFTER_HONEY;
+  if (dishesCooked.includes("苦辛醒神湯")) return DIALOGUE_BLOCK_DAY2_AFTER_BITTER;
+  if (dishesCooked.includes("撫慰鹹粥")) return DIALOGUE_BLOCK_DAY2_AFTER_SALTY;
+  return null;
+}
+
+/**
+ * 從 topicsDone 取得 day2_to_day3_transition 當前 seq
+ * @param {string[]} topicsDone
+ * @returns {number}
+ */
+function getDay2ToDay3CurrentSeq(topicsDone) {
+  if (!topicsDone || !Array.isArray(topicsDone)) return 0;
+  const blockId = DIALOGUE_BLOCK_DAY2_TO_DAY3;
+  const escaped = blockId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let maxSeq = 0;
+  topicsDone.forEach(function(t) {
+    const m = String(t).match(new RegExp("^" + escaped + "_(\\d+)$"));
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n > maxSeq) maxSeq = n;
+    }
+  });
+  return maxSeq;
+}
+
+/**
+ * 從 topicsDone 取得 Day 2 After dialogue 當前 seq（day2_after_XXX_N）
+ * @param {string[]} topicsDone
+ * @param {string} blockId
+ * @returns {number}
+ */
+function getDay2AfterCurrentSeq(topicsDone, blockId) {
+  if (!topicsDone || !Array.isArray(topicsDone) || !blockId) return 0;
+  const escaped = blockId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let maxSeq = 0;
+  topicsDone.forEach(function(t) {
+    const m = String(t).match(new RegExp("^" + escaped + "_(\\d+)$"));
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (n > maxSeq) maxSeq = n;
+    }
+  });
+  return maxSeq;
+}
+
+/**
+ * 將 Day 2 After dialogue block seq 1 的 quickReply 綁到訊息陣列最後一則，
+ * 並移除 flex footer 的 postback 按鈕（由 dialogue quickReply 取代）
+ * @param {Array} messages - 料理結果訊息陣列
+ * @param {string} blockId
+ * @returns {Array}
+ */
+function applyDay2AfterDialogueSeq1(messages, blockId) {
+  if (!messages || !messages.length || !blockId) return messages;
+  const node = getDialogueNode(blockId, 1);
+  if (!node || !node.quickReply) return messages;
+  const last = messages[messages.length - 1];
+  if (last && typeof last === "object") {
+    last.quickReply = node.quickReply;
+    if (last.type === "flex" && last.contents && last.contents.footer) {
+      delete last.contents.footer;
+    }
+  }
+  return messages;
+}
+
+/**
+ * 依 userText 取得下一 seq，若為「明天繼續」或「最後一天」則回傳 advanceReturn
  * @param {string} blockId
  * @param {number} currentSeq
  * @param {string} userText
- * @returns {number|"advance_day2"|null}
+ * @param {string} [advanceReturn="advance_day2"] - 當用戶選明天繼續時回傳此值
+ * @returns {number|string|null}
  */
-function getDialogueNextSeq(blockId, currentSeq, userText) {
+function getDialogueNextSeq(blockId, currentSeq, userText, advanceReturn) {
   const norm = function(s) { return String(s || "").trim(); };
-  const isTomorrow = norm(userText) === "【明天繼續】" || norm(userText) === "明天繼續" || norm(userText) === "明天";
-  if (isTomorrow) return "advance_day2";
+  const ret = (advanceReturn != null && advanceReturn !== "") ? advanceReturn : "advance_day2";
+  const isAdvance = norm(userText) === "【明天繼續】" || norm(userText) === "明天繼續" || norm(userText) === "明天" ||
+    norm(userText) === "【最後一天】" || norm(userText) === "最後一天" ||
+    norm(userText) === "【晚安】" || norm(userText) === "晚安" || norm(userText) === "明天見";
+  if (isAdvance) return ret;
   const node = getDialogueNode(blockId, currentSeq);
   if (!node || !node.options || node.options.length === 0) return null;
   let matchedIdx = -1;
@@ -1391,6 +1521,23 @@ function advancePhase(event, userId, state) {
       newPhase = (newDay === 3) ? PHASE.COOKING : PHASE.DAY;
     }
   }
+
+  // P1：Day 2 After → Day 3 時，若有過渡段 block 則先進入（不立即推進）
+  if (currentState.currentDay === 2 && currentState.phase === PHASE.AFTER && newDay === 3 &&
+      hasDialogueBlock(DIALOGUE_BLOCK_DAY2_TO_DAY3)) {
+    showLoadingAnimation(userId, 5);
+    addTopic(userId, currentState, DIALOGUE_BLOCK_DAY2_TO_DAY3 + "_1");
+    const node = getDialogueNode(DIALOGUE_BLOCK_DAY2_TO_DAY3, 1);
+    if (node) {
+      const msg = dialogueNodeToMessage(node);
+      if (Array.isArray(msg)) {
+        replyMessage(event.replyToken, msg);
+      } else if (msg) {
+        replyMessage(event.replyToken, msg);
+      }
+    }
+    return;
+  }
   
   // 如果 phase 沒有變化，不做任何事（避免重複處理）
   if (newPhase === currentState.phase && newDay === currentState.currentDay) {
@@ -1416,7 +1563,11 @@ function advancePhase(event, userId, state) {
       getDay1DayShift(state)
     ]);
   } else if (newDay === 2 && newPhase === PHASE.DAY) {
-    replyMessage(event.replyToken, getDay2DayShift(state));
+    // 目的二：Day 2 開場呼吸點，再送選單
+    replyMessage(event.replyToken, [
+      { type: "text", text: "雨打在窗上。老人坐在窗邊，望著外面。\n\n他聽見你的腳步聲，轉過頭。" },
+      getDay2DayShift(state)
+    ]);
   } else if (newDay === 3 && newPhase === PHASE.COOKING) {
     // Day 2 After → Day 3 Cooking：加入與黑貓的過渡對話
     // ⚠️ 注意：這裡有 3 條文字 + 1 個 flex = 4 條，符合限制
@@ -2721,7 +2872,10 @@ function handleDay1After(event, userId, state, userText) {
         lastActive: new Date().toISOString()
       });
       const updatedState = getUserState(userId);
-      replyMessage(event.replyToken, getDay2DayShift(updatedState));
+      replyMessage(event.replyToken, [
+        { type: "text", text: "雨打在窗上。老人坐在窗邊，望著外面。\n\n他聽見你的腳步聲，轉過頭。" },
+        getDay2DayShift(updatedState)
+      ]);
       return;
     }
     if (typeof next === "number" && next > 0) {
@@ -2747,7 +2901,10 @@ function handleDay1After(event, userId, state, userText) {
     });
     // 獲取更新後的狀態
     const updatedState = getUserState(userId);
-    replyMessage(event.replyToken, getDay2DayShift(updatedState));
+    replyMessage(event.replyToken, [
+      { type: "text", text: "雨打在窗上。老人坐在窗邊，望著外面。\n\n他聽見你的腳步聲，轉過頭。" },
+      getDay2DayShift(updatedState)
+    ]);
     return;
   }
   
@@ -2884,7 +3041,7 @@ function getDay1CookingTea_Part3() {
     getDay1CookingMemoryCard(),
     {
       type: "text",
-      text: "【老人睜開眼，眼中有淚光】\n\n「有個人...曾經給我泡過茶。」\n「很小的手...捧著茶杯的小手...」",
+      text: "【老人睜開眼，眼中有淚光】\n\n「有個人...曾經給我泡過茶。」\n「很小的手...捧著茶杯的小手...」\n\n他沒有放下茶杯。就那樣握著，像是握著誰的手。\n\n窗外的雨聲細碎。食堂裡很安靜。你看著他，一時不知該說什麼。",
       quickReply: {
         items: [{
           type: "action",
@@ -3193,7 +3350,7 @@ function getDay1CookingSoup_Part2() {
     getDay1SoupMemoryCard(),
     {
       type: "text",
-      text: "【老人回過神，眼神變得清晰】\n\n「我...想起來了。」\n\n「我在店裡...迷路了。」",
+      text: "【老人回過神，眼神變得清晰】\n\n「我...想起來了。」\n\n「我在店裡...迷路了。」\n\n他放下湯碗，雙手還微微顫抖。看向窗外——只有雨。像是在確認自己到底在哪裡。\n\n你看著他，一時不知該說什麼。",
       quickReply: {
         items: [{
           type: "action",
@@ -3318,6 +3475,21 @@ function getDay1SoupMemoryCard() {
       }
     }
   };
+}
+
+// ============================================================
+// Day 2 Idle Line - 目的二：呼吸點、氛圍（依已完成話題回傳）
+// ============================================================
+function getDay2IdleLine(topicsDone) {
+  if (!Array.isArray(topicsDone)) topicsDone = [];
+  // 依情感強度優先選用（典禮裂痕 > 雪中 > 美雪小時候 > 夢 > 死亡 > 搜尋）
+  if (topicsDone.includes("ceremony_rift")) return "他握緊拳頭，又鬆開。";
+  if (topicsDone.includes("snow_then")) return "他的雙手微微顫抖，像在回憶某種觸感。";
+  if (topicsDone.includes("miyuki_childhood")) return "他的嘴角有一絲笑，很快又消失了。";
+  if (topicsDone.includes("dream_part3")) return "他低下頭，手指在桌面上反覆比劃著什麼。像在縫。";
+  if (topicsDone.includes("death")) return "他望向窗外，嘴唇動了動，但沒發出聲音。";
+  if (topicsDone.includes("search")) return "他看著自己的手，像是在確認什麼。";
+  return "老人坐在窗邊。雨還在下。";
 }
 
 // ============================================================
@@ -3549,7 +3721,7 @@ function handleDay2Day(event, userId, state, userText) {
     // 獲取更新後的狀態
     const updatedState = getUserState(userId);
     
-    // 發送情緒爆發訊息 + 回到選擇畫面
+    // 發送情緒爆發訊息 + 回到選擇畫面（目的二：夢話題 idle 併入獲得記憶，控制 5 則上限）
     replyMessage(event.replyToken, [
       {
         type: "text",
@@ -3565,22 +3737,20 @@ function handleDay2Day(event, userId, state, userText) {
       },
       {
         type: "text",
-        text: "✨ 獲得記憶食材：😢 眼淚、👧 女兒-美雪、💍 婚紗"
+        text: "✨ 獲得記憶食材：😢 眼淚、👧 女兒-美雪、💍 婚紗\n\n他低下頭，手指在桌面上反覆比劃著什麼。像在縫。"
       },
       getDay2DayShift(updatedState)
     ]);
     return;
   }
   
-  // 玩家選擇「安慰他」- 回到選擇畫面
+  // 玩家選擇「安慰他」- 回到選擇畫面（目的二：話題結束 idle）
   if (userText === "沒事的...你盡力了..." && topicsDone.includes("dream_part3")) {
     showLoadingAnimation(userId, 5);
     const updatedState = getUserState(userId);
     replyMessage(event.replyToken, [
-      {
-        type: "text",
-        text: "【老人】\n「...謝謝你。」"
-      },
+      { type: "text", text: "【老人】\n「...謝謝你。」" },
+      { type: "text", text: getDay2IdleLine(updatedState.topicsDone) },
       getDay2DayShift(updatedState)
     ]);
     return;
@@ -3598,20 +3768,12 @@ function handleDay2Day(event, userId, state, userText) {
     // 獲取更新後的狀態
     const updatedState = getUserState(userId);
     
-    // 回覆對話 + 回到選擇畫面
+    // 回覆對話 + 回到選擇畫面（目的二：話題結束 idle）
     replyMessage(event.replyToken, [
-      {
-        type: "text",
-        text: "老人：「婚紗...我在縫婚紗...」"
-      },
-      {
-        type: "text",
-        text: "「給我女兒...給美雪的婚紗...」"
-      },
-      {
-        type: "text",
-        text: "✨ 獲得記憶食材：🎯 執念、💍 婚紗"
-      },
+      { type: "text", text: "老人：「婚紗...我在縫婚紗...」" },
+      { type: "text", text: "「給我女兒...給美雪的婚紗...」" },
+      { type: "text", text: "✨ 獲得記憶食材：🎯 執念、💍 婚紗" },
+      { type: "text", text: getDay2IdleLine(updatedState.topicsDone) },
       getDay2DayShift(updatedState)
     ]);
     return;
@@ -3630,20 +3792,12 @@ function handleDay2Day(event, userId, state, userText) {
     // 獲取更新後的狀態
     const updatedState = getUserState(userId);
     
-    // 回覆對話 + 回到選擇畫面（合併訊息，確保不超過 5 條）
+    // 回覆對話 + 回到選擇畫面（目的二：話題結束 idle）
     replyMessage(event.replyToken, [
-      {
-        type: "text",
-        text: "【老人的眼神變得恍惚】\n\n「雪...對，有很多雪...」"
-      },
-      {
-        type: "text",
-        text: "「我在閣樓...縫最後一針的時候...」\n「窗外...下著大雪...」\n\n「然後...我迷路了...」"
-      },
-      {
-        type: "text",
-        text: "✨ 獲得記憶食材：❄️ 雪、💀 死亡、💧 寒冷"
-      },
+      { type: "text", text: "【老人的眼神變得恍惚】\n\n「雪...對，有很多雪...」" },
+      { type: "text", text: "「我在閣樓...縫最後一針的時候...」\n「窗外...下著大雪...」\n\n「然後...我迷路了...」" },
+      { type: "text", text: "✨ 獲得記憶食材：❄️ 雪、💀 死亡、💧 寒冷" },
+      { type: "text", text: getDay2IdleLine(updatedState.topicsDone) },
       getDay2DayShift(updatedState)
     ]);
     return;
@@ -3659,18 +3813,10 @@ function handleDay2Day(event, userId, state, userText) {
     addMemory(userId, state, "第一次叫爸爸");
     const updatedState = getUserState(userId);
     replyMessage(event.replyToken, [
-      {
-        type: "text",
-        text: "【老人沉默了一會】\n\n「她…小時候，很愛笑。」"
-      },
-      {
-        type: "text",
-        text: "「拿一張畫跑進來說『爸爸你看』…」\n「便當做太甜，我還說少放點糖。」\n「第一次叫爸爸的時候…」\n【他沒說下去】"
-      },
-      {
-        type: "text",
-        text: "✨ 獲得記憶食材：🍯 美雪的笑容、👶 第一次叫爸爸"
-      },
+      { type: "text", text: "【老人沉默了一會】\n\n「她…小時候，很愛笑。」" },
+      { type: "text", text: "「拿一張畫跑進來說『爸爸你看』…」\n「便當做太甜，我還說少放點糖。」\n「第一次叫爸爸的時候…」\n【他沒說下去】" },
+      { type: "text", text: "✨ 獲得記憶食材：🍯 美雪的笑容、👶 第一次叫爸爸" },
+      { type: "text", text: getDay2IdleLine(updatedState.topicsDone) },
       getDay2DayShift(updatedState)
     ]);
     return;
@@ -3687,18 +3833,10 @@ function handleDay2Day(event, userId, state, userText) {
     addMemory(userId, state, "執念");  // 補充：最後一針的執念，解鎖苦辛醒神湯
     const updatedState = getUserState(userId);
     replyMessage(event.replyToken, [
-      {
-        type: "text",
-        text: "【他閉上眼】\n\n「閣樓…在做一件衣服。」"
-      },
-      {
-        type: "text",
-        text: "「最後一針…穿過去…然後……」\n「我忘了門在哪。下了樓，外面都是雪。」\n「就一直走…」"
-      },
-      {
-        type: "text",
-        text: "✨ 獲得記憶食材：🪡 最後一針、🏚️ 閣樓、🎯 執念"
-      },
+      { type: "text", text: "【他閉上眼】\n\n「閣樓…在做一件衣服。」" },
+      { type: "text", text: "「最後一針…穿過去…然後……」\n「我忘了門在哪。下了樓，外面都是雪。」\n「就一直走…」" },
+      { type: "text", text: "✨ 獲得記憶食材：🪡 最後一針、🏚️ 閣樓、🎯 執念" },
+      { type: "text", text: getDay2IdleLine(updatedState.topicsDone) },
       getDay2DayShift(updatedState)
     ]);
     return;
@@ -3741,13 +3879,11 @@ function handleDay2Day(event, userId, state, userText) {
   }
   
   // === 預設回應（避免鬼打牆）===
-  // 回到選擇畫面
+  // 回到選擇畫面（目的二：預設 idle）
   showLoadingAnimation(userId, 5);
   replyMessage(event.replyToken, [
-    {
-      type: "text",
-      text: "【黑貓】\n「...你想跟他聊什麼？」"
-    },
+    { type: "text", text: "【黑貓】\n「...你想跟他聊什麼？」" },
+    { type: "text", text: getDay2IdleLine(state.topicsDone) },
     getDay2DayShift(state)
   ]);
 }
@@ -4028,12 +4164,12 @@ function getDay2TopicDreamMessages_Part1() {
   ];
 }
 
-// 第 2 波：記憶閃現（5 條訊息）
+// 第 2 波：記憶閃現（5 條訊息）（目的二：Part1→Part2 之間 idle 呼吸點）
 function getDay2TopicDreamMessages_Part2() {
   return [
     {
       type: "text",
-      text: "【記憶開始閃現...】"
+      text: "他停頓了一下，望向窗外。\n\n【記憶開始閃現...】"
     },
     getDay2MemoryCard1(),
     getDay2MemoryCard2(),
@@ -4379,7 +4515,13 @@ function handleDay2Cooking(event, userId, state, userText) {
     showLoadingAnimation(userId, 5);
     addDishCooked(userId, state, "蜜汁燉菜");
     updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-    replyMessage(event.replyToken, getDay2CookingResult(state));  // V4.10: 傳入 state
+    let msgs = getDay2CookingResult(state);
+    const blockId = getDay2AfterBlockId(state.dishesCooked || []);
+    if (blockId && hasDialogueBlock(blockId)) {
+      addTopic(userId, state, blockId + "_1");
+      msgs = applyDay2AfterDialogueSeq1(msgs, blockId);
+    }
+    replyMessage(event.replyToken, msgs);
     return;
   } else if (userText.includes("苦辛") || userText.includes("醒神") || userText === "【做苦辛醒神湯】") {
     if (shouldUseLiffCooking()) {
@@ -4402,7 +4544,13 @@ function handleDay2Cooking(event, userId, state, userText) {
     showLoadingAnimation(userId, 5);
     addDishCooked(userId, state, "苦辛醒神湯");
     updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-    replyMessage(event.replyToken, getDay2CookingResult_苦辛(state));  // V4.10: 傳入 state
+    let msgsBit = getDay2CookingResult_苦辛(state);
+    const blockIdBit = getDay2AfterBlockId(state.dishesCooked || []);
+    if (blockIdBit && hasDialogueBlock(blockIdBit)) {
+      addTopic(userId, state, blockIdBit + "_1");
+      msgsBit = applyDay2AfterDialogueSeq1(msgsBit, blockIdBit);
+    }
+    replyMessage(event.replyToken, msgsBit);
     return;
   } else if (userText.includes("撫慰") || userText.includes("鹹粥") || userText === "【做撫慰鹹粥】") {
     if (shouldUseLiffCooking()) {
@@ -4426,7 +4574,13 @@ function handleDay2Cooking(event, userId, state, userText) {
     addDishCooked(userId, state, "撫慰鹹粥");
     addMemory(userId, state, "失語");  // V4.5 新增：翻譯者概念
     updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-    replyMessage(event.replyToken, getDay2CookingResult_撫慰());
+    let msgsSalt = getDay2CookingResult_撫慰();
+    const blockIdSalt = getDay2AfterBlockId(state.dishesCooked || []);
+    if (blockIdSalt && hasDialogueBlock(blockIdSalt)) {
+      addTopic(userId, state, blockIdSalt + "_1");
+      msgsSalt = applyDay2AfterDialogueSeq1(msgsSalt, blockIdSalt);
+    }
+    replyMessage(event.replyToken, msgsSalt);
     return;
   } else {
     // 預設回應 - 顯示廚房場景
@@ -5104,22 +5258,126 @@ function determineEnding(flavors) {
 }
 
 function handleDay2After(event, userId, state, userText) {
-  // 處理「最後一天」或「明天」
+  // P1：Day 2→3 過渡段（三線匯集）：若在此 block 中，依選項推進或 advance
+  const day2to3Seq = getDay2ToDay3CurrentSeq(state.topicsDone || []);
+  if (day2to3Seq > 0 && hasDialogueBlock(DIALOGUE_BLOCK_DAY2_TO_DAY3)) {
+    const next = getDialogueNextSeq(DIALOGUE_BLOCK_DAY2_TO_DAY3, day2to3Seq, userText, "advance_day3");
+    if (next === "advance_day3") {
+      showLoadingAnimation(userId, 5);
+      updateUserState(userId, {
+        currentDay: 3,
+        phase: PHASE.COOKING,
+        lastActive: new Date().toISOString()
+      });
+      const updatedState = getUserState(userId);
+      replyMessage(event.replyToken, [
+        { type: "text", text: "━━━━━━━━━━━━━━━\n\n【第三天】\n\n━━━━━━━━━━━━━━━" },
+        { type: "text", text: "【黑貓跳上窗台】\n\n「今天是最後一天了。」\n\n「...你準備好了嗎？」" },
+        { type: "text", text: "窗外的雨，\n似乎小了一點。\n\n空氣中瀰漫著淡淡的期待感。" },
+        getDay3CookingStart(updatedState)
+      ]);
+      return;
+    }
+    if (typeof next === "number" && next > 0) {
+      const nextNode = getDialogueNode(DIALOGUE_BLOCK_DAY2_TO_DAY3, next);
+      if (nextNode) {
+        showLoadingAnimation(userId, 5);
+        addTopic(userId, state, DIALOGUE_BLOCK_DAY2_TO_DAY3 + "_" + next);
+        const msg = dialogueNodeToMessage(nextNode);
+        if (Array.isArray(msg)) {
+          replyMessage(event.replyToken, msg);
+        } else if (msg) {
+          replyMessage(event.replyToken, msg);
+        }
+        return;
+      }
+    }
+  }
+
+  // Day 2 After 擴增劇本：若在 dialogue 進行中，依選項推進或 advance
+  const blockId = getDay2AfterBlockId(state.dishesCooked || []);
+  const currentSeq = getDay2AfterCurrentSeq(state.topicsDone || [], blockId);
+  if (blockId && currentSeq > 0 && hasDialogueBlock(blockId)) {
+    const next = getDialogueNextSeq(blockId, currentSeq, userText, "advance_day3");
+    if (next === "advance_day3") {
+      if (hasDialogueBlock(DIALOGUE_BLOCK_DAY2_TO_DAY3)) {
+        showLoadingAnimation(userId, 5);
+        addTopic(userId, state, DIALOGUE_BLOCK_DAY2_TO_DAY3 + "_1");
+        const node = getDialogueNode(DIALOGUE_BLOCK_DAY2_TO_DAY3, 1);
+        if (node) {
+          const msg = dialogueNodeToMessage(node);
+          if (Array.isArray(msg)) {
+            replyMessage(event.replyToken, msg);
+          } else if (msg) {
+            replyMessage(event.replyToken, msg);
+          }
+        }
+        return;
+      }
+      showLoadingAnimation(userId, 5);
+      updateUserState(userId, {
+        currentDay: 3,
+        phase: PHASE.COOKING,
+        lastActive: new Date().toISOString()
+      });
+      const updatedState = getUserState(userId);
+      replyMessage(event.replyToken, [
+        { type: "text", text: "━━━━━━━━━━━━━━━\n\n【第三天】\n\n━━━━━━━━━━━━━━━" },
+        { type: "text", text: "【黑貓跳上窗台】\n\n「今天是最後一天了。」\n\n「...你準備好了嗎？」" },
+        { type: "text", text: "窗外的雨，\n似乎小了一點。\n\n空氣中瀰漫著淡淡的期待感。" },
+        getDay3CookingStart(updatedState)
+      ]);
+      return;
+    }
+    if (typeof next === "number" && next > 0) {
+      const nextNode = getDialogueNode(blockId, next);
+      if (nextNode) {
+        showLoadingAnimation(userId, 5);
+        addTopic(userId, state, blockId + "_" + next);
+        const msg = dialogueNodeToMessage(nextNode);
+        if (Array.isArray(msg)) {
+          replyMessage(event.replyToken, msg);
+        } else if (msg) {
+          replyMessage(event.replyToken, msg);
+        }
+        return;
+      }
+    }
+  }
+  
+  // 無 dialogue 或 fallback：處理「最後一天」或「明天」→ 若有 day2_to_day3 過渡段則先進入
   if (userText === "【最後一天】" || userText === "最後一天" || userText === "明天" || userText === "【明天繼續】") {
+    if (hasDialogueBlock(DIALOGUE_BLOCK_DAY2_TO_DAY3)) {
+      showLoadingAnimation(userId, 5);
+      addTopic(userId, state, DIALOGUE_BLOCK_DAY2_TO_DAY3 + "_1");
+      const node = getDialogueNode(DIALOGUE_BLOCK_DAY2_TO_DAY3, 1);
+      if (node) {
+        const msg = dialogueNodeToMessage(node);
+        if (Array.isArray(msg)) {
+          replyMessage(event.replyToken, msg);
+        } else if (msg) {
+          replyMessage(event.replyToken, msg);
+        }
+      }
+      return;
+    }
     showLoadingAnimation(userId, 5);
-    // 推進到 Day 3
     updateUserState(userId, {
       currentDay: 3,
       phase: PHASE.COOKING,
       lastActive: new Date().toISOString()
     });
-    // 獲取更新後的狀態
     const updatedState = getUserState(userId);
-    replyMessage(event.replyToken, getDay3CookingStart(updatedState));
+    replyMessage(event.replyToken, [
+      { type: "text", text: "━━━━━━━━━━━━━━━\n\n【第三天】\n\n━━━━━━━━━━━━━━━" },
+      { type: "text", text: "【黑貓跳上窗台】\n\n「今天是最後一天了。」\n\n「...你準備好了嗎？」" },
+      { type: "text", text: "窗外的雨，\n似乎小了一點。\n\n空氣中瀰漫著淡淡的期待感。" },
+      getDay3CookingStart(updatedState)
+    ]);
     return;
   }
   
-  // 預設回應
+  // 預設回應（dialogue 不存在時）
   showLoadingAnimation(userId, 5);
   replyMessage(event.replyToken, {
     type: "text",
