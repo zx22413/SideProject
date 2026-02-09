@@ -1,8 +1,8 @@
 // ============================================================
 // 靈魂食堂 - 田中太郎重構版（神秘感優先）
-// 版本: V4.15 (Dialogue 擴增劇本系統)
+// 版本: V4.16 (加入好友後開場白)
 // 創建日期: 2026-01-20
-// 最後更新: 2026-02-07
+// 最後更新: 2026-02-09
 // 基於: 畫鬼腳 MVP v1.0
 // ============================================================
 //
@@ -115,6 +115,11 @@
 // - Sheet 名稱: "dialogue"（可選，不存在則回退硬編碼流程）
 // - 欄位: block_id | seq | system_msg | quick_reply | next_seq | note
 //
+// V4.16 新增功能（2026-02-09）- 加入好友後開場白:
+// - doPost 處理 follow 事件，加入好友時不顯示 Loading 動畫
+// - getWelcomeAfterFollow()：世界觀簡介 + 玩法說明 +「遊戲開始」CTA Flex 按鈕
+// - handleFollow(event)：以 reply 回傳歡迎訊息，點擊「遊戲開始」觸發 postback start_game → getOpening()
+//
 // ============================================================
 
 // ============================================================
@@ -206,14 +211,20 @@ function doPost(e) {
     
     const event = data.events[0];
     
-    // ✨ 立即顯示 Loading Animation（在任何處理之前）
-    // 這樣用戶按下按鈕後會立即看到 Loading 動畫
-    if (event.source && event.source.userId) {
+    // ✨ 立即顯示 Loading Animation（在任何處理之前）（加入好友不顯示，保持歡迎體驗）
+    if (event.type !== "follow" && event.source && event.source.userId) {
       showLoadingAnimation(event.source.userId, 10);
     }
     
     if (CONFIG.DEBUG_MODE) {
       Logger.log("收到事件: " + JSON.stringify(event));
+    }
+    
+    // 處理加入好友（歡迎訊息 + 遊戲說明 + 遊戲開始 CTA）
+    if (event.type === "follow") {
+      handleFollow(event);
+      return ContentService.createTextOutput(JSON.stringify({status: "ok"}))
+        .setMimeType(ContentService.MimeType.JSON);
     }
     
     // 處理文字訊息
@@ -1685,6 +1696,60 @@ function showLoadingAnimation(chatId, seconds = 5) {
       Logger.log("Loading Animation 失敗: " + error);
     }
   }
+}
+
+// ============================================================
+// 加入好友後開場白（世界觀 + 玩法簡介 + 遊戲開始 CTA）
+// ============================================================
+function getWelcomeAfterFollow() {
+  return [
+    {
+      type: "text",
+      text: "歡迎來到靈魂食堂。\n\n這裡是雨夜裡的一間老食堂，迷途的靈魂會來訪。\n你是主廚——用「記憶」做料理，送他們一程。"
+    },
+    {
+      type: "text",
+      text: "【玩法】\n・三天一夜：與靈魂對話、收集記憶碎片。\n・在廚房把記憶煮成料理。\n・你的選擇會影響結局與他們帶走的遺物。\n・※PS：系統訊息可能會一次發送多則，可能錯過劇情，請向上滑動查看劇情"
+    },
+    {
+      type: "flex",
+      altText: "點擊「遊戲開始」進入食堂",
+      contents: {
+        type: "bubble",
+        body: {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "text",
+              text: "準備好了就開始吧。",
+              wrap: true,
+              size: "md"
+            }
+          ]
+        },
+        footer: {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "button",
+              action: {
+                type: "postback",
+                label: "遊戲開始",
+                data: "start_game"
+              },
+              style: "primary"
+            }
+          ]
+        }
+      }
+    }
+  ];
+}
+
+function handleFollow(event) {
+  replyMessage(event.replyToken, getWelcomeAfterFollow());
 }
 
 // ============================================================
