@@ -6243,7 +6243,11 @@ function getDay3Farewell(state, userId) {
     })(),
     {
       type: "text",
-      text: "━━━━━━━━━━━━━━━\n\n" + catLine + "\n\n━━━━━━━━━━━━━━━\n\n⭐ Guest 1 完結\n\n感謝遊玩！",
+      text: "━━━━━━━━━━━━━━━\n\n" + catLine + "\n\n━━━━━━━━━━━━━━━\n\n⭐ Guest 1 完結\n\n感謝遊玩！"
+    },
+    {
+      type: "text",
+      text: "謝謝你送走田中。這份問卷約 3–5 分鐘，用來幫我們確認體驗、美術與未來方向。選最接近你感受的就好，沒有標準答案；最後可留聯絡方式，方便後續封測邀請。\n\n📋 填寫問卷：https://forms.gle/CqeYVcZjyjUHRBrM6",
       quickReply: {
         items: [{ type: "action", action: { type: "message", label: "重新開始", text: "重新開始" } }]
       }
