@@ -1,8 +1,8 @@
 // ============================================================
 // 靈魂食堂 - 田中太郎重構版（神秘感優先）
-// 版本: V4.16 (加入好友後開場白)
+// 版本: V4.17 (Flex 連續推送節奏改善)
 // 創建日期: 2026-01-20
-// 最後更新: 2026-02-09
+// 最後更新: 2026-02-16
 // 基於: 畫鬼腳 MVP v1.0
 // ============================================================
 //
@@ -119,6 +119,16 @@
 // - doPost 處理 follow 事件，加入好友時不顯示 Loading 動畫
 // - getWelcomeAfterFollow()：世界觀簡介 + 玩法說明 +「遊戲開始」CTA Flex 按鈕
 // - handleFollow(event)：以 reply 回傳歡迎訊息，點擊「遊戲開始」觸發 postback start_game → getOpening()
+//
+// V4.17 新增功能（2026-02-16）- Flex 連續推送節奏改善（封測反饋）:
+// - **方法一**：replyThenPushAfterDelay / replyThenPushSequence（先 reply 再延遲 1 秒 push）
+// - **方法二**：Flex 前先送 quickReply，postback 再送 Flex（flow=opening_flex、tanaka_enter_flex、
+//   day1_day_shift、day2_day_shift、day3_cooking_start、day2_after_flex、farewell_heirloom）
+// - 開場 / 田中進場 / Day1・Day2・Day3 過渡 / Day2 料理↔After Hours / 結局↔遺物↔問卷 改為方法二
+// - 記憶劇場（選你的手）Part2、最終章拆段（Part1/Part2）、遺物↔問卷 改為方法一
+// - 最終章 getDay3EndingFlexCard 拆成 getDay3EndingFlexCardPart1 / Part2
+// - 告別改為 getDay3FarewellOpening + postback 觸發 handleFarewellHeirloomAndSurvey
+// - LIFF Day2 料理完成：先 push 料理文字，1 秒後 push After Hours Flex
 //
 // ============================================================
 
@@ -558,38 +568,26 @@ function handleLiffCookingCompleteMessage(event, userId, state, dishName) {
     if (dishName === "蜜汁燉菜") {
       addDishCooked(userId, state, "蜜汁燉菜");
       updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-      let msgs = getDay2CookingResult(state);
-      const blockId = getDay2AfterBlockId(state.dishesCooked || []);
-      if (blockId && hasDialogueBlock(blockId)) {
-        addTopic(userId, state, blockId + "_1");
-        msgs = applyDay2AfterDialogueSeq1(msgs, blockId);
-      }
-      replyMessage(event.replyToken, msgs);
+      var blockId = getDay2AfterBlockId(state.dishesCooked || []);
+      if (blockId && hasDialogueBlock(blockId)) addTopic(userId, state, blockId + "_1");
+      replyMessage(event.replyToken, getDay2CookingResult(state));
       return true;
     }
     if (dishName === "苦辛醒神湯") {
       addDishCooked(userId, state, "苦辛醒神湯");
       updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-      let msgsB = getDay2CookingResult_苦辛(state);
-      const blockIdB = getDay2AfterBlockId(state.dishesCooked || []);
-      if (blockIdB && hasDialogueBlock(blockIdB)) {
-        addTopic(userId, state, blockIdB + "_1");
-        msgsB = applyDay2AfterDialogueSeq1(msgsB, blockIdB);
-      }
-      replyMessage(event.replyToken, msgsB);
+      var blockIdB = getDay2AfterBlockId(state.dishesCooked || []);
+      if (blockIdB && hasDialogueBlock(blockIdB)) addTopic(userId, state, blockIdB + "_1");
+      replyMessage(event.replyToken, getDay2CookingResult_苦辛(state));
       return true;
     }
     if (dishName === "撫慰鹹粥") {
       addMemory(userId, state, "失語");
       addDishCooked(userId, state, "撫慰鹹粥");
       updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-      let msgsS = getDay2CookingResult_撫慰();
-      const blockIdS = getDay2AfterBlockId(state.dishesCooked || []);
-      if (blockIdS && hasDialogueBlock(blockIdS)) {
-        addTopic(userId, state, blockIdS + "_1");
-        msgsS = applyDay2AfterDialogueSeq1(msgsS, blockIdS);
-      }
-      replyMessage(event.replyToken, msgsS);
+      var blockIdS = getDay2AfterBlockId(state.dishesCooked || []);
+      if (blockIdS && hasDialogueBlock(blockIdS)) addTopic(userId, state, blockIdS + "_1");
+      replyMessage(event.replyToken, getDay2CookingResult_撫慰());
       return true;
     }
   }
@@ -630,38 +628,41 @@ function pushLiffCookingCompleteStoryline(userId, dishName) {
     if (dishName === "蜜汁燉菜") {
       addDishCooked(userId, state, "蜜汁燉菜");
       updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-      let msgs = getDay2CookingResult(state);
-      const blockId = getDay2AfterBlockId(state.dishesCooked || []);
-      if (blockId && hasDialogueBlock(blockId)) {
-        addTopic(userId, state, blockId + "_1");
-        msgs = applyDay2AfterDialogueSeq1(msgs, blockId);
-      }
-      pushMessages(userId, msgs);
+      var s2 = getUserState(userId);
+      var blockId = getDay2AfterBlockId(s2.dishesCooked || []);
+      if (blockId && hasDialogueBlock(blockId)) addTopic(userId, s2, blockId + "_1");
+      pushMessages(userId, getDay2CookingResult(s2));
+      Utilities.sleep(1000);
+      var afterMsgs = getDay2AfterFlexOnly(blockId, getUserState(userId));
+      if (blockId && hasDialogueBlock(blockId)) afterMsgs = applyDay2AfterDialogueSeq1(afterMsgs, blockId);
+      pushMessages(userId, afterMsgs);
       return { success: true };
     }
     if (dishName === "苦辛醒神湯") {
       addDishCooked(userId, state, "苦辛醒神湯");
       updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-      let msgsB = getDay2CookingResult_苦辛(state);
-      const blockIdB = getDay2AfterBlockId(state.dishesCooked || []);
-      if (blockIdB && hasDialogueBlock(blockIdB)) {
-        addTopic(userId, state, blockIdB + "_1");
-        msgsB = applyDay2AfterDialogueSeq1(msgsB, blockIdB);
-      }
-      pushMessages(userId, msgsB);
+      var s2 = getUserState(userId);
+      var blockIdB = getDay2AfterBlockId(s2.dishesCooked || []);
+      if (blockIdB && hasDialogueBlock(blockIdB)) addTopic(userId, s2, blockIdB + "_1");
+      pushMessages(userId, getDay2CookingResult_苦辛(s2));
+      Utilities.sleep(1000);
+      var afterMsgsB = getDay2AfterFlexOnly(blockIdB, getUserState(userId));
+      if (blockIdB && hasDialogueBlock(blockIdB)) afterMsgsB = applyDay2AfterDialogueSeq1(afterMsgsB, blockIdB);
+      pushMessages(userId, afterMsgsB);
       return { success: true };
     }
     if (dishName === "撫慰鹹粥") {
       addMemory(userId, state, "失語");
       addDishCooked(userId, state, "撫慰鹹粥");
       updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-      let msgsS = getDay2CookingResult_撫慰();
-      const blockIdS = getDay2AfterBlockId(state.dishesCooked || []);
-      if (blockIdS && hasDialogueBlock(blockIdS)) {
-        addTopic(userId, state, blockIdS + "_1");
-        msgsS = applyDay2AfterDialogueSeq1(msgsS, blockIdS);
-      }
-      pushMessages(userId, msgsS);
+      var s2 = getUserState(userId);
+      var blockIdS = getDay2AfterBlockId(s2.dishesCooked || []);
+      if (blockIdS && hasDialogueBlock(blockIdS)) addTopic(userId, s2, blockIdS + "_1");
+      pushMessages(userId, getDay2CookingResult_撫慰());
+      Utilities.sleep(1000);
+      var afterMsgsS = getDay2AfterFlexOnly(blockIdS, getUserState(userId));
+      if (blockIdS && hasDialogueBlock(blockIdS)) afterMsgsS = applyDay2AfterDialogueSeq1(afterMsgsS, blockIdS);
+      pushMessages(userId, afterMsgsS);
       return { success: true };
     }
   }
@@ -963,6 +964,48 @@ function handlePostback(event) {
   if (data === "start_game") {
     resetUser(userId);
     replyMessage(event.replyToken, getOpening());
+    return;
+  }
+  
+  // ============================================================
+  // 連續推送節奏：方法二 postback（Flex 前先 quickReply）
+  // ============================================================
+  if (data === "flow=opening_flex") {
+    replyMessage(event.replyToken, getOpeningFlexOnly());
+    return;
+  }
+  if (data === "flow=tanaka_enter_flex") {
+    replyMessage(event.replyToken, getTanakaEnterFlexOnly());
+    return;
+  }
+  if (data === "flow=day1_day_shift") {
+    var s = getUserState(userId);
+    replyMessage(event.replyToken, getDay1DayShift(s));
+    return;
+  }
+  if (data === "flow=day2_day_shift") {
+    var s = getUserState(userId);
+    replyMessage(event.replyToken, getDay2DayShift(s));
+    return;
+  }
+  if (data === "flow=day3_cooking_start") {
+    var s = getUserState(userId);
+    replyMessage(event.replyToken, getDay3CookingStart(s));
+    return;
+  }
+  if (data.startsWith("flow=day2_after_flex")) {
+    var s = getUserState(userId);
+    var blockId = data.indexOf(":") >= 0 ? data.split(":")[1] : getDay2AfterBlockId(s.dishesCooked || []);
+    var msgs = getDay2AfterFlexOnly(blockId, s);
+    if (blockId && hasDialogueBlock(blockId)) {
+      msgs = applyDay2AfterDialogueSeq1(msgs, blockId);
+    }
+    replyMessage(event.replyToken, msgs);
+    return;
+  }
+  if (data === "flow=farewell_heirloom") {
+    var s = getUserState(userId);
+    handleFarewellHeirloomAndSurvey(event.replyToken, userId, s);
     return;
   }
   
@@ -1568,25 +1611,39 @@ function advancePhase(event, userId, state) {
   showLoadingAnimation(userId, 5);
   
   if (newDay === 1 && newPhase === PHASE.DAY) {
-    // Day 1 Night → Day 1 Day：加入過渡文字
+    // Day 1 Night → Day 1 Day：方法二，先文字 + quickReply「跟老人聊天」
     replyMessage(event.replyToken, [
-      { type: "text", text: "【看向老人】\n\n他的眼神空洞，\n像是在看著很遠很遠的地方。" },
-      getDay1DayShift(state)
+      {
+        type: "text",
+        text: "【看向老人】\n\n他的眼神空洞，\n像是在看著很遠很遠的地方。",
+        quickReply: {
+          items: [{ type: "action", action: { type: "postback", label: "跟老人聊天", data: "flow=day1_day_shift" } }]
+        }
+      }
     ]);
   } else if (newDay === 2 && newPhase === PHASE.DAY) {
-    // 目的二：Day 2 開場呼吸點，再送選單
+    // Day 2 開場：方法二，先文字 + quickReply「跟老人聊天」
     replyMessage(event.replyToken, [
-      { type: "text", text: "雨打在窗上。老人坐在窗邊，望著外面。\n\n他聽見你的腳步聲，轉過頭。" },
-      getDay2DayShift(state)
+      {
+        type: "text",
+        text: "雨打在窗上。老人坐在窗邊，望著外面。\n\n他聽見你的腳步聲，轉過頭。",
+        quickReply: {
+          items: [{ type: "action", action: { type: "postback", label: "跟老人聊天", data: "flow=day2_day_shift" } }]
+        }
+      }
     ]);
   } else if (newDay === 3 && newPhase === PHASE.COOKING) {
-    // Day 2 After → Day 3 Cooking：加入與黑貓的過渡對話
-    // ⚠️ 注意：這裡有 3 條文字 + 1 個 flex = 4 條，符合限制
+    // Day 2 After → Day 3 Cooking：方法二，三則文字後 quickReply「進行最終料理」
     replyMessage(event.replyToken, [
       { type: "text", text: "━━━━━━━━━━━━━━━\n\n【第三天】\n\n━━━━━━━━━━━━━━━" },
       { type: "text", text: "【黑貓跳上窗台】\n\n「今天是最後一天了。」\n\n「...你準備好了嗎？」" },
-      { type: "text", text: "窗外的雨，\n似乎小了一點。\n\n空氣中瀰漫著淡淡的期待感。" },
-      getDay3CookingStart(state)
+      {
+        type: "text",
+        text: "窗外的雨，\n似乎小了一點。\n\n空氣中瀰漫著淡淡的期待感。",
+        quickReply: {
+          items: [{ type: "action", action: { type: "postback", label: "進行最終料理", data: "flow=day3_cooking_start" } }]
+        }
+      }
     ]);
   }
 }
@@ -1654,6 +1711,41 @@ function pushMessages(userId, messages) {
     UrlFetchApp.fetch(url, options);
   } catch (error) {
     Logger.log("Push 訊息失敗: " + error);
+  }
+}
+
+// ============================================================
+// 連續推送節奏：方法一（先 reply 再延遲 push）
+// ============================================================
+/**
+ * 先 reply 第一批，等待 delayMs 後用 push 送第二批。用於「上面還有劇情」呼吸感。
+ * @param {string} replyToken - LINE reply token（僅用一次）
+ * @param {string} userId - 用戶 ID（第二批用 push）
+ * @param {Array|object} firstBatch - 第一批訊息（陣列或單一物件）
+ * @param {Array|object} secondBatch - 第二批訊息
+ * @param {number} [delayMs=1000] - 延遲毫秒
+ */
+function replyThenPushAfterDelay(replyToken, userId, firstBatch, secondBatch, delayMs) {
+  if (delayMs == null) delayMs = 1000;
+  replyMessage(replyToken, firstBatch);
+  Utilities.sleep(delayMs);
+  pushMessages(userId, secondBatch);
+}
+
+/**
+ * 多批連續推送：reply 第一批，之後每批間隔 delayMs 用 push 送出。
+ * @param {string} replyToken - LINE reply token
+ * @param {string} userId - 用戶 ID
+ * @param {Array.<Array|object>} batches - 每批訊息（陣列之陣列）
+ * @param {number} [delayMs=1000] - 批與批之間延遲毫秒
+ */
+function replyThenPushSequence(replyToken, userId, batches, delayMs) {
+  if (!batches || batches.length === 0) return;
+  if (delayMs == null) delayMs = 1000;
+  replyMessage(replyToken, batches[0]);
+  for (var i = 1; i < batches.length; i++) {
+    Utilities.sleep(delayMs);
+    pushMessages(userId, batches[i]);
   }
 }
 
@@ -1753,8 +1845,9 @@ function handleFollow(event) {
 }
 
 // ============================================================
-// 開場：極簡神秘版
+// 開場：極簡神秘版（方法二：先兩則文字 + quickReply，postback 再送黑貓 Flex）
 // ============================================================
+/** 開場前兩則文字，最後一則帶 quickReply，點擊後 postback flow=opening_flex */
 function getOpening() {
   return [
     {
@@ -1763,100 +1856,110 @@ function getOpening() {
     },
     {
       type: "text",
-      text: "你睜開眼。\n\n眼前是一間老舊的食堂。\n木質吧台，生鏽的爐灶，\n窗外只有雨。\n\n你不記得自己怎麼來的。"
-    },
-    {
-      type: "flex",
-      altText: "黑貓登場",
-      contents: {
-        type: "bubble",
-        body: {
-          type: "box",
-          layout: "vertical",
-          contents: [
-            {
-              type: "image",
-              url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/opening_black_cat_hero.png?v=2",
-              size: "full",
-              aspectRatio: "3:2",
-              aspectMode: "cover"
-            },
-            {
-              type: "box",
-              layout: "vertical",
-              margin: "lg",
-              spacing: "md",
-              contents: [
-                {
-                  type: "text",
-                  text: "【一隻黑貓趴在吧台上】",
-                  size: "sm",
-                  color: "#999999",
-                  wrap: true
-                },
-                {
-                  type: "text",
-                  text: "「...」",
-                  wrap: true
-                },
-                {
-                  type: "text",
-                  text: "【牠睜開眼，盯著你看了一會兒】",
-                  size: "sm",
-                  color: "#999999",
-                  wrap: true,
-                  margin: "md"
-                },
-                {
-                  type: "text",
-                  text: "「哦，醒了啊。」",
-                  wrap: true
-                },
-                {
-                  type: "text",
-                  text: "【黑貓打了個哈欠】",
-                  size: "sm",
-                  color: "#999999",
-                  wrap: true,
-                  margin: "md"
-                },
-                {
-                  type: "text",
-                  text: "「行吧，那就開工吧。」",
-                  wrap: true
-                },
-                {
-                  type: "text",
-                  text: "「等等會有客人來。」",
-                  wrap: true
-                },
-                {
-                  type: "text",
-                  text: "「煮點吃的給他們，別餓死人就好。」",
-                  wrap: true
-                }
-              ]
-            }
-          ]
-        },
-        footer: {
-          type: "box",
-          layout: "vertical",
-          contents: [
-            {
-              type: "button",
-              action: {
-                type: "message",
-                label: "等等，這裡是...？",
-                text: "這裡是...？"
-              },
-              style: "primary"
-            }
-          ]
-        }
+      text: "你睜開眼。\n\n眼前是一間老舊的食堂。\n木質吧台，生鏽的爐灶，\n窗外只有雨。\n\n你不記得自己怎麼來的。",
+      quickReply: {
+        items: [{
+          type: "action",
+          action: { type: "postback", label: "繼續", data: "flow=opening_flex" }
+        }]
       }
     }
   ];
+}
+
+/** 開場黑貓 Flex（由 postback flow=opening_flex 觸發） */
+function getOpeningFlexOnly() {
+  return {
+    type: "flex",
+    altText: "黑貓登場",
+    contents: {
+      type: "bubble",
+      body: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "image",
+            url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/opening_black_cat_hero.png?v=2",
+            size: "full",
+            aspectRatio: "3:2",
+            aspectMode: "cover"
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            margin: "lg",
+            spacing: "md",
+            contents: [
+              {
+                type: "text",
+                text: "【一隻黑貓趴在吧台上】",
+                size: "sm",
+                color: "#999999",
+                wrap: true
+              },
+              {
+                type: "text",
+                text: "「...」",
+                wrap: true
+              },
+              {
+                type: "text",
+                text: "【牠睜開眼，盯著你看了一會兒】",
+                size: "sm",
+                color: "#999999",
+                wrap: true,
+                margin: "md"
+              },
+              {
+                type: "text",
+                text: "「哦，醒了啊。」",
+                wrap: true
+              },
+              {
+                type: "text",
+                text: "【黑貓打了個哈欠】",
+                size: "sm",
+                color: "#999999",
+                wrap: true,
+                margin: "md"
+              },
+              {
+                type: "text",
+                text: "「行吧，那就開工吧。」",
+                wrap: true
+              },
+              {
+                type: "text",
+                text: "「等等會有客人來。」",
+                wrap: true
+              },
+              {
+                type: "text",
+                text: "「煮點吃的給他們，別餓死人就好。」",
+                wrap: true
+              }
+            ]
+          }
+        ]
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "button",
+            action: {
+              type: "message",
+              label: "等等，這裡是...？",
+              text: "這裡是...？"
+            },
+            style: "primary"
+          }
+        ]
+      }
+    }
+  };
 }
 
 // ============================================================
@@ -1948,92 +2051,64 @@ function getBlackCatResponse2() {
   };
 }
 
+/** 客人進場：方法二，先一則文字 + quickReply，postback 再送 Flex */
 function getTanakaEnter() {
   return [
     {
       type: "text",
-      text: "━━━━━━━━━━━━━━━\n\n[門被推開的聲音]\n\n━━━━━━━━━━━━━━━"
-    },
-    {
-      type: "flex",
-      altText: "客人來了",
-      contents: {
-        type: "bubble",
-        body: {
-          type: "box",
-          layout: "vertical",
-          contents: [
-            {
-              type: "image",
-              url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day1_night_old_man_enters.png?v=2",
-              size: "full",
-              aspectRatio: "3:2",
-              aspectMode: "cover"
-            },
-            {
-              type: "box",
-              layout: "vertical",
-              margin: "lg",
-              spacing: "md",
-              contents: [
-                {
-                  type: "text",
-                  text: "[門被推開]",
-                  size: "sm",
-                  color: "#999999",
-                  wrap: true
-                },
-                {
-                  type: "text",
-                  text: "風雨灌入。",
-                  wrap: true
-                },
-                {
-                  type: "text",
-                  text: "一位老人踉蹌走進來，\n渾身濕透。",
-                  wrap: true,
-                  margin: "md"
-                },
-                {
-                  type: "text",
-                  text: "他的大衣破舊，\n雙手僵硬地彎曲著。",
-                  wrap: true
-                },
-                {
-                  type: "text",
-                  text: "【老人跌坐在椅子上】",
-                  size: "sm",
-                  color: "#999999",
-                  wrap: true,
-                  margin: "md"
-                },
-                {
-                  type: "text",
-                  text: "「...冷...」",
-                  wrap: true
-                }
-              ]
-            }
-          ]
-        },
-        footer: {
-          type: "box",
-          layout: "vertical",
-          contents: [
-            {
-              type: "button",
-              action: {
-                type: "postback",
-                label: "👁️ 觀察他",
-                data: "next_phase:1:night"
-              },
-              style: "primary"
-            }
-          ]
-        }
+      text: "━━━━━━━━━━━━━━━\n\n[門被推開的聲音]\n\n━━━━━━━━━━━━━━━",
+      quickReply: {
+        items: [{ type: "action", action: { type: "postback", label: "繼續", data: "flow=tanaka_enter_flex" } }]
       }
     }
   ];
+}
+
+/** 老人進場 Flex（由 postback flow=tanaka_enter_flex 觸發） */
+function getTanakaEnterFlexOnly() {
+  return {
+    type: "flex",
+    altText: "客人來了",
+    contents: {
+      type: "bubble",
+      body: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "image",
+            url: "https://media.githubusercontent.com/media/zx22413/SideProject/refs/heads/main/04-%E8%B3%87%E6%BA%90%E7%B4%A0%E6%9D%90/%E5%9C%96%E7%89%87/%E9%81%8A%E6%88%B2%E7%B4%A0%E6%9D%90/day1_night_old_man_enters.png?v=2",
+            size: "full",
+            aspectRatio: "3:2",
+            aspectMode: "cover"
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            margin: "lg",
+            spacing: "md",
+            contents: [
+              { type: "text", text: "[門被推開]", size: "sm", color: "#999999", wrap: true },
+              { type: "text", text: "風雨灌入。", wrap: true },
+              { type: "text", text: "一位老人踉蹌走進來，\n渾身濕透。", wrap: true, margin: "md" },
+              { type: "text", text: "他的大衣破舊，\n雙手僵硬地彎曲著。", wrap: true },
+              { type: "text", text: "【老人跌坐在椅子上】", size: "sm", color: "#999999", wrap: true, margin: "md" },
+              { type: "text", text: "「...冷...」", wrap: true }
+            ]
+          }
+        ]
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        contents: [{
+          type: "button",
+          action: { type: "postback", label: "👁️ 觀察他", data: "next_phase:1:night" },
+          style: "primary"
+        }]
+      }
+    }
+  };
 }
 
 // ============================================================
@@ -2225,7 +2300,7 @@ function handleDay1Day(event, userId, state, userText) {
     return;
   }
   
-  // 處理「繼續」→ 發送 Part 2，然後回到話題選擇畫面
+  // 處理「繼續」→ 發送 Part 2（方法一：先 reply 記憶閃現+卡片，1 秒後 push 後兩則+話題選單）
   if (userText === "【繼續】" && topicsDone.includes("hands_part1") && !topicsDone.includes("hands_part2")) {
     showLoadingAnimation(userId, 5);
     addMemory(userId, state, "針");
@@ -2233,11 +2308,11 @@ function handleDay1Day(event, userId, state, userText) {
     addMemory(userId, state, "寒冷");
     addMemory(userId, state, "裁縫手藝");
     addTopic(userId, state, "hands_part2");
-    const updatedState = getUserState(userId);  // 重新獲取更新後的狀態
-    // Part 2 內容 + 回到話題選擇畫面（顯示延伸話題按鈕）
+    var updatedState = getUserState(userId);
     var part2Messages = getDay1TopicHandsMessages_Part2_NoQuickReply();
-    part2Messages.push(getDay1DayShift(updatedState));
-    replyMessage(event.replyToken, part2Messages);
+    var firstBatch = [part2Messages[0], part2Messages[1]];
+    var secondBatch = [part2Messages[2], part2Messages[3], getDay1DayShift(updatedState)];
+    replyThenPushAfterDelay(event.replyToken, userId, firstBatch, secondBatch, 1000);
     return;
   }
   
@@ -2938,8 +3013,13 @@ function handleDay1After(event, userId, state, userText) {
       });
       const updatedState = getUserState(userId);
       replyMessage(event.replyToken, [
-        { type: "text", text: "雨打在窗上。老人坐在窗邊，望著外面。\n\n他聽見你的腳步聲，轉過頭。" },
-        getDay2DayShift(updatedState)
+        {
+          type: "text",
+          text: "雨打在窗上。老人坐在窗邊，望著外面。\n\n他聽見你的腳步聲，轉過頭。",
+          quickReply: {
+            items: [{ type: "action", action: { type: "postback", label: "跟老人聊天", data: "flow=day2_day_shift" } }]
+          }
+        }
       ]);
       return;
     }
@@ -2964,11 +3044,16 @@ function handleDay1After(event, userId, state, userText) {
       phase: PHASE.DAY,
       lastActive: new Date().toISOString()
     });
-    // 獲取更新後的狀態
+    // 獲取更新後的狀態，方法二：先文字 + quickReply「跟老人聊天」
     const updatedState = getUserState(userId);
     replyMessage(event.replyToken, [
-      { type: "text", text: "雨打在窗上。老人坐在窗邊，望著外面。\n\n他聽見你的腳步聲，轉過頭。" },
-      getDay2DayShift(updatedState)
+      {
+        type: "text",
+        text: "雨打在窗上。老人坐在窗邊，望著外面。\n\n他聽見你的腳步聲，轉過頭。",
+        quickReply: {
+          items: [{ type: "action", action: { type: "postback", label: "跟老人聊天", data: "flow=day2_day_shift" } }]
+        }
+      }
     ]);
     return;
   }
@@ -4580,13 +4665,9 @@ function handleDay2Cooking(event, userId, state, userText) {
     showLoadingAnimation(userId, 5);
     addDishCooked(userId, state, "蜜汁燉菜");
     updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-    let msgs = getDay2CookingResult(state);
-    const blockId = getDay2AfterBlockId(state.dishesCooked || []);
-    if (blockId && hasDialogueBlock(blockId)) {
-      addTopic(userId, state, blockId + "_1");
-      msgs = applyDay2AfterDialogueSeq1(msgs, blockId);
-    }
-    replyMessage(event.replyToken, msgs);
+    var blockId = getDay2AfterBlockId(state.dishesCooked || []);
+    if (blockId && hasDialogueBlock(blockId)) addTopic(userId, state, blockId + "_1");
+    replyMessage(event.replyToken, getDay2CookingResult(state));
     return;
   } else if (userText.includes("苦辛") || userText.includes("醒神") || userText === "【做苦辛醒神湯】") {
     if (shouldUseLiffCooking()) {
@@ -4609,13 +4690,9 @@ function handleDay2Cooking(event, userId, state, userText) {
     showLoadingAnimation(userId, 5);
     addDishCooked(userId, state, "苦辛醒神湯");
     updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-    let msgsBit = getDay2CookingResult_苦辛(state);
-    const blockIdBit = getDay2AfterBlockId(state.dishesCooked || []);
-    if (blockIdBit && hasDialogueBlock(blockIdBit)) {
-      addTopic(userId, state, blockIdBit + "_1");
-      msgsBit = applyDay2AfterDialogueSeq1(msgsBit, blockIdBit);
-    }
-    replyMessage(event.replyToken, msgsBit);
+    var blockIdBit = getDay2AfterBlockId(state.dishesCooked || []);
+    if (blockIdBit && hasDialogueBlock(blockIdBit)) addTopic(userId, state, blockIdBit + "_1");
+    replyMessage(event.replyToken, getDay2CookingResult_苦辛(state));
     return;
   } else if (userText.includes("撫慰") || userText.includes("鹹粥") || userText === "【做撫慰鹹粥】") {
     if (shouldUseLiffCooking()) {
@@ -4639,13 +4716,9 @@ function handleDay2Cooking(event, userId, state, userText) {
     addDishCooked(userId, state, "撫慰鹹粥");
     addMemory(userId, state, "失語");  // V4.5 新增：翻譯者概念
     updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
-    let msgsSalt = getDay2CookingResult_撫慰();
-    const blockIdSalt = getDay2AfterBlockId(state.dishesCooked || []);
-    if (blockIdSalt && hasDialogueBlock(blockIdSalt)) {
-      addTopic(userId, state, blockIdSalt + "_1");
-      msgsSalt = applyDay2AfterDialogueSeq1(msgsSalt, blockIdSalt);
-    }
-    replyMessage(event.replyToken, msgsSalt);
+    var blockIdSalt = getDay2AfterBlockId(state.dishesCooked || []);
+    if (blockIdSalt && hasDialogueBlock(blockIdSalt)) addTopic(userId, state, blockIdSalt + "_1");
+    replyMessage(event.replyToken, getDay2CookingResult_撫慰());
     return;
   } else {
     // 預設回應 - 顯示廚房場景
@@ -4820,6 +4893,7 @@ function getDay2CookingResult(state) {
     memoryLines = "「記憶」\n";
   }
   
+  // 方法二：先送三則料理完成文字，最後一則 quickReply，postback 再送 After Hours Flex
   return [
     {
       type: "text",
@@ -4831,159 +4905,83 @@ function getDay2CookingResult(state) {
     },
     {
       type: "text",
-      text: "[料理完成]\n\n琥珀色的燉菜。\n\n【你將燉菜端給老人】\n\n【他舀起一口，放進嘴裡】\n\n【老人的表情變了】\n\n「這個味道...」\n「是甜的。又甜又鹹...」\n「像眼淚一樣...」"
-    },
-    {
-      type: "flex",
-      altText: "Day 2 After Hours",
-      contents: {
-        type: "bubble",
-        body: {
-          type: "box",
-          layout: "vertical",
-          contents: [
-            {
-              type: "text",
-              text: "🌃 After Hours",
-              weight: "bold",
-              color: "#546E7A"
-            },
-            {
-              type: "separator",
-              margin: "md"
-            },
-            {
-              type: "box",
-              layout: "vertical",
-              margin: "lg",
-              spacing: "md",
-              contents: [
-                {
-                  type: "text",
-                  text: "你將料理端給老人。",
-                  wrap: true
-                },
-                {
-                  type: "text",
-                  text: "【老人看著這碗燉菜】",
-                  size: "sm",
-                  color: "#999999",
-                  wrap: true,
-                  margin: "md"
-                },
-                {
-                  type: "text",
-                  text: "琥珀色的湯汁，\n散發著奇特的香氣。",
-                  wrap: true,
-                  size: "sm"
-                },
-                {
-                  type: "text",
-                  text: "【他舀起一口，放進嘴裡】",
-                  size: "sm",
-                  color: "#999999",
-                  wrap: true,
-                  margin: "md"
-                },
-                {
-                  type: "text",
-                  text: "沉默。",
-                  wrap: true
-                },
-                {
-                  type: "text",
-                  text: "眼淚突然滑落。",
-                  wrap: true,
-                  margin: "md"
-                },
-                {
-                  type: "text",
-                  text: "「這味道...又甜又鹹...」",
-                  wrap: true,
-                  margin: "md"
-                },
-                {
-                  type: "separator",
-                  margin: "lg"
-                },
-                {
-                  type: "text",
-                  text: "【記憶劇場全面開啟】",
-                  size: "sm",
-                  color: "#FFD700",
-                  wrap: true,
-                  margin: "lg",
-                  weight: "bold"
-                },
-                {
-                  type: "text",
-                  text: "「我記起來了...」",
-                  wrap: true,
-                  margin: "md"
-                },
-                {
-                  type: "text",
-                  text: "「我在為美雪縫製婚紗。」",
-                  wrap: true
-                },
-                {
-                  type: "text",
-                  text: "「但...最後一針...我有沒有縫好？」",
-                  wrap: true,
-                  margin: "md"
-                }
-              ]
-            }
-          ]
-        },
-        footer: {
-          type: "box",
-          layout: "vertical",
-          contents: [
-            {
-              type: "text",
-              text: "💭 Day 2 結束",
-              size: "sm",
-              color: "#999999",
-              align: "center"
-            },
-            {
-              type: "separator",
-              margin: "md"
-            },
-            {
-              type: "button",
-              action: {
-                type: "postback",
-                label: "最後一天",
-                data: "next_phase:2:after"
-              },
-              style: "primary",
-              margin: "md"
-            }
-          ]
-        }
+      text: "[料理完成]\n\n琥珀色的燉菜。\n\n【你將燉菜端給老人】\n\n【他舀起一口，放進嘴裡】\n\n【老人的表情變了】\n\n「這個味道...」\n「是甜的。又甜又鹹...」\n「像眼淚一樣...」",
+      quickReply: {
+        items: [{ type: "action", action: { type: "postback", label: "繼續", data: "flow=day2_after_flex:" + DIALOGUE_BLOCK_DAY2_AFTER_HONEY } }]
       }
     }
   ];
 }
 
-/** Day 2 料理結果：苦辛醒神湯。最後一針 + 雪中。≤5 則一次 reply。 */
+/** 蜜汁燉菜 After Hours Flex（由 postback flow=day2_after_flex:day2_after_honey 觸發） */
+function getDay2AfterFlexHoney() {
+  return {
+    type: "flex",
+    altText: "Day 2 After Hours",
+    contents: {
+      type: "bubble",
+      body: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          { type: "text", text: "🌃 After Hours", weight: "bold", color: "#546E7A" },
+          { type: "separator", margin: "md" },
+          {
+            type: "box",
+            layout: "vertical",
+            margin: "lg",
+            spacing: "md",
+            contents: [
+              { type: "text", text: "你將料理端給老人。", wrap: true },
+              { type: "text", text: "【老人看著這碗燉菜】", size: "sm", color: "#999999", wrap: true, margin: "md" },
+              { type: "text", text: "琥珀色的湯汁，\n散發著奇特的香氣。", wrap: true, size: "sm" },
+              { type: "text", text: "【他舀起一口，放進嘴裡】", size: "sm", color: "#999999", wrap: true, margin: "md" },
+              { type: "text", text: "沉默。", wrap: true },
+              { type: "text", text: "眼淚突然滑落。", wrap: true, margin: "md" },
+              { type: "text", text: "「這味道...又甜又鹹...」", wrap: true, margin: "md" },
+              { type: "separator", margin: "lg" },
+              { type: "text", text: "【記憶劇場全面開啟】", size: "sm", color: "#FFD700", wrap: true, margin: "lg", weight: "bold" },
+              { type: "text", text: "「我記起來了...」", wrap: true, margin: "md" },
+              { type: "text", text: "「我在為美雪縫製婚紗。」", wrap: true },
+              { type: "text", text: "「但...最後一針...我有沒有縫好？」", wrap: true, margin: "md" }
+            ]
+          }
+        ]
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          { type: "text", text: "💭 Day 2 結束", size: "sm", color: "#999999", align: "center" },
+          { type: "separator", margin: "md" },
+          { type: "button", action: { type: "postback", label: "最後一天", data: "next_phase:2:after" }, style: "primary", margin: "md" }
+        ]
+      }
+    }
+  };
+}
+
+/** 回傳僅 After Hours 段（供 postback flow=day2_after_flex 使用）。blockId: day2_after_honey | day2_after_bitter | day2_after_salty */
+function getDay2AfterFlexOnly(blockId, state) {
+  if (blockId === DIALOGUE_BLOCK_DAY2_AFTER_HONEY) {
+    return [getDay2AfterFlexHoney()];
+  }
+  if (blockId === DIALOGUE_BLOCK_DAY2_AFTER_BITTER) {
+    return [getDay2AfterFlex("又苦又冷", "「這味道……好冷。雪一直下。」", "「我……做好了……」")];
+  }
+  if (blockId === DIALOGUE_BLOCK_DAY2_AFTER_SALTY) {
+    return [getDay2AfterFlex("有人翻譯", "「她懂我……但她走了……」", "「從那之後，我的愛就變成了啞巴。」")];
+  }
+  return [];
+}
+
+/** Day 2 料理結果：苦辛醒神湯。方法二：先文字+記憶劇場，最後 quickReply 再送 After Hours。 */
 // V4.10 更新：動態顯示玩家實際收集的記憶 + 記憶劇場改為 Flex Card
 function getDay2CookingResult_苦辛(state) {
   const memories = state ? (state.collectedMemories || []) : [];
-  
-  // 篩選與苦辛醒神湯相關的記憶
   const bitterMemories = ["執念", "雪", "死亡"];
   const collected = memories.filter(m => bitterMemories.includes(m));
-  
-  // 動態生成記憶食材列表
-  let memoryList = "";
-  if (collected.length > 0) {
-    memoryList = collected.map(m => `「${m}」`).join("、");
-  } else {
-    memoryList = "「記憶」";
-  }
+  let memoryList = collected.length > 0 ? collected.map(m => `「${m}」`).join("、") : "「記憶」";
   
   return [
     {
@@ -5171,7 +5169,13 @@ function getDay2CookingResult_苦辛(state) {
         }
       }
     },
-    getDay2AfterFlex("又苦又冷", "「這味道……好冷。雪一直下。」", "「我……做好了……」")
+    {
+      type: "text",
+      text: "【記憶劇場結束】",
+      quickReply: {
+        items: [{ type: "action", action: { type: "postback", label: "繼續", data: "flow=day2_after_flex:" + DIALOGUE_BLOCK_DAY2_AFTER_BITTER } }]
+      }
+    }
   ];
 }
 
@@ -5220,9 +5224,11 @@ function getDay2CookingResult_撫慰() {
     },
     {
       type: "text",
-      text: "【畫面變暗】\n\n然而，翻譯的人走了。\n剩下一個啞巴父親，和一個聽不懂針線話的女兒。\n\n✨ 獲得記憶食材：🗣️ 失語"
-    },
-    getDay2AfterFlex("有人翻譯", "「她懂我……但她走了……」", "「從那之後，我的愛就變成了啞巴。」")
+      text: "【畫面變暗】\n\n然而，翻譯的人走了。\n剩下一個啞巴父親，和一個聽不懂針線話的女兒。\n\n✨ 獲得記憶食材：🗣️ 失語",
+      quickReply: {
+        items: [{ type: "action", action: { type: "postback", label: "繼續", data: "flow=day2_after_flex:" + DIALOGUE_BLOCK_DAY2_AFTER_SALTY } }]
+      }
+    }
   ];
 }
 
@@ -5338,8 +5344,13 @@ function handleDay2After(event, userId, state, userText) {
       replyMessage(event.replyToken, [
         { type: "text", text: "━━━━━━━━━━━━━━━\n\n【第三天】\n\n━━━━━━━━━━━━━━━" },
         { type: "text", text: "【黑貓跳上窗台】\n\n「今天是最後一天了。」\n\n「...你準備好了嗎？」" },
-        { type: "text", text: "窗外的雨，\n似乎小了一點。\n\n空氣中瀰漫著淡淡的期待感。" },
-        getDay3CookingStart(updatedState)
+        {
+          type: "text",
+          text: "窗外的雨，\n似乎小了一點。\n\n空氣中瀰漫著淡淡的期待感。",
+          quickReply: {
+            items: [{ type: "action", action: { type: "postback", label: "進行最終料理", data: "flow=day3_cooking_start" } }]
+          }
+        }
       ]);
       return;
     }
@@ -5389,8 +5400,13 @@ function handleDay2After(event, userId, state, userText) {
       replyMessage(event.replyToken, [
         { type: "text", text: "━━━━━━━━━━━━━━━\n\n【第三天】\n\n━━━━━━━━━━━━━━━" },
         { type: "text", text: "【黑貓跳上窗台】\n\n「今天是最後一天了。」\n\n「...你準備好了嗎？」" },
-        { type: "text", text: "窗外的雨，\n似乎小了一點。\n\n空氣中瀰漫著淡淡的期待感。" },
-        getDay3CookingStart(updatedState)
+        {
+          type: "text",
+          text: "窗外的雨，\n似乎小了一點。\n\n空氣中瀰漫著淡淡的期待感。",
+          quickReply: {
+            items: [{ type: "action", action: { type: "postback", label: "進行最終料理", data: "flow=day3_cooking_start" } }]
+          }
+        }
       ]);
       return;
     }
@@ -5436,8 +5452,13 @@ function handleDay2After(event, userId, state, userText) {
     replyMessage(event.replyToken, [
       { type: "text", text: "━━━━━━━━━━━━━━━\n\n【第三天】\n\n━━━━━━━━━━━━━━━" },
       { type: "text", text: "【黑貓跳上窗台】\n\n「今天是最後一天了。」\n\n「...你準備好了嗎？」" },
-      { type: "text", text: "窗外的雨，\n似乎小了一點。\n\n空氣中瀰漫著淡淡的期待感。" },
-      getDay3CookingStart(updatedState)
+      {
+        type: "text",
+        text: "窗外的雨，\n似乎小了一點。\n\n空氣中瀰漫著淡淡的期待感。",
+        quickReply: {
+          items: [{ type: "action", action: { type: "postback", label: "進行最終料理", data: "flow=day3_cooking_start" } }]
+        }
+      }
     ]);
     return;
   }
@@ -5636,16 +5657,19 @@ function handleDay3Cooking(event, userId, state, userText) {
     replyMessage(event.replyToken, getDay3CookingProcess_Part2(state)); // V4.9: 傳遞 state
     return;
   }
-  // 處理【端出料理】
+  // 處理【端出料理】（方法一：先 reply 文字，1 秒後 push 最終章 Part1，再 1 秒 push Part2）
   else if (userText.includes("端出") || userText === "【端出料理】") {
     showLoadingAnimation(userId, 5);
-    // 更新到結局階段
     updateUserState(userId, {
       phase: PHASE.AFTER,
       lastActive: new Date().toISOString()
     });
-    const updatedState = getUserState(userId);
+    var updatedState = getUserState(userId);
     replyMessage(event.replyToken, getDay3Ending(updatedState));
+    Utilities.sleep(1000);
+    pushMessages(userId, [getDay3EndingFlexCardPart1(updatedState)]);
+    Utilities.sleep(1000);
+    pushMessages(userId, [getDay3EndingFlexCardPart2(updatedState)]);
     return;
   } 
   else {
@@ -5874,7 +5898,7 @@ function getDay3Ending(state) {
     type: "text",
     text: "━━━━━━━━━━━━━━━\n\n你端著料理走出廚房。\n\n老人坐在窗邊。\n\n窗外的雨...停了。\n\n━━━━━━━━━━━━━━━"
   };
-  return [first, ...extraLines, getDay3EndingFlexCard(state)];
+  return [first, ...extraLines];
 }
 
 /**
@@ -6136,11 +6160,94 @@ function getDay3EndingFlexCard(state) {
   };
 }
 
+/** 最終章拆段：Part1 = 標題+引言+dialogue+最終記憶（方法一：與 Part2 間隔 1 秒 push） */
+function getDay3EndingFlexCardPart1(state) {
+  var memories = state ? (state.collectedMemories || []) : [];
+  var flavors = calculateFlavorBalance(memories);
+  var endingType = determineEnding(flavors);
+  var quote = "「美雪...爸爸做好了。」";
+  if (memories.includes("銀座的驕傲")) quote = "「這是我這輩子，最完美的作品。」";
+  else if (memories.includes("缺席的典禮")) quote = "「這一次，爸爸沒有遲到。」";
+  else if (memories.includes("失語")) quote = "「不用翻譯了。這就是我想說的話。」";
+  else if (memories.includes("空蕩的店")) quote = "「這間店最後的作品，獻給最重要的人。」";
+  var monologue = getTruthMonologue(endingType);
+  var dialogueContents = [];
+  dialogueContents.push({ type: "text", text: "【老人】", size: "sm", color: "#999999", wrap: true });
+  monologue.dialogue.forEach(function(line, index) {
+    var o = { type: "text", text: line.text, wrap: true };
+    if (line.color) o.color = line.color;
+    if (line.size) o.size = line.size;
+    if (line.weight) o.weight = line.weight;
+    if (index > 0) o.margin = "md";
+    dialogueContents.push(o);
+  });
+  dialogueContents.push({ type: "separator", margin: "lg" });
+  dialogueContents.push({ type: "text", text: "【最終記憶】", size: "sm", color: "#FFD700", wrap: true, margin: "lg", weight: "bold" });
+  monologue.finalMemory.forEach(function(line) {
+    var o = { type: "text", text: line.text, wrap: true };
+    if (line.color) o.color = line.color;
+    if (line.size) o.size = line.size;
+    if (line.weight) o.weight = line.weight;
+    dialogueContents.push(o);
+  });
+  return {
+    type: "flex",
+    altText: "Day 3 - 真相（上）",
+    contents: {
+      type: "bubble",
+      body: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          { type: "text", text: "⭐ 最終章", weight: "bold", size: "xl", color: "#FFD700", align: "center" },
+          { type: "text", text: quote, size: "sm", color: "#546E7A", align: "center", wrap: true, margin: "md", style: "italic" },
+          { type: "separator", margin: "md" },
+          { type: "box", layout: "vertical", margin: "lg", spacing: "md", contents: dialogueContents }
+        ]
+      }
+    }
+  };
+}
+
+/** 最終章拆段：Part2 = 恢復後反應 + 告別按鈕 */
+function getDay3EndingFlexCardPart2(state) {
+  var memories = state ? (state.collectedMemories || []) : [];
+  var endingType = determineEnding(calculateFlavorBalance(memories));
+  var monologue = getTruthMonologue(endingType);
+  var afterContents = [];
+  monologue.afterMemory.forEach(function(line, index) {
+    var o = { type: "text", text: line.text, wrap: true };
+    if (line.color) o.color = line.color;
+    if (line.size) o.size = line.size;
+    if (line.weight) o.weight = line.weight;
+    if (index > 0 && line.weight === "bold") o.margin = "md";
+    if (index === 0) o.margin = "lg";
+    afterContents.push(o);
+  });
+  return {
+    type: "flex",
+    altText: "Day 3 - 真相（下）",
+    contents: {
+      type: "bubble",
+      body: {
+        type: "box",
+        layout: "vertical",
+        contents: [{ type: "box", layout: "vertical", margin: "lg", spacing: "md", contents: afterContents }]
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        contents: [{ type: "button", action: { type: "message", label: "告別", text: "【告別】" }, style: "primary", color: "#F57C00" }]
+      }
+    }
+  };
+}
+
 function handleDay3Ending(event, userId, state, userText) {
   if (userText.includes("告別") || userText.includes("再見") || userText === "【告別】") {
     showLoadingAnimation(userId, 5);
-    const s = getUserState(userId) || state;
-    replyMessage(event.replyToken, getDay3Farewell(s, userId));
+    var s = getUserState(userId) || state;
+    replyMessage(event.replyToken, getDay3FarewellOpening(s, userId));
     return;
   }
   
@@ -6318,6 +6425,30 @@ function getDay3Farewell(state, userId) {
       }
     }
   ];
+}
+
+/** 告別場景方法二：僅告別 Flex + quickReply「獲得遺物」，postback 再送遺物與問卷（遺物↔問卷用方法一） */
+function getDay3FarewellOpening(state, userId) {
+  var full = getDay3Farewell(state, userId);
+  return [
+    full[0],
+    {
+      type: "text",
+      text: "他留下了什麼？",
+      quickReply: {
+        items: [{ type: "action", action: { type: "postback", label: "獲得遺物", data: "flow=farewell_heirloom" } }]
+      }
+    }
+  ];
+}
+
+/** postback flow=farewell_heirloom：送遺物 Flex，1 秒後 push 黑貓+問卷（方法一） */
+function handleFarewellHeirloomAndSurvey(replyToken, userId, state) {
+  var s = getUserState(userId) || state;
+  var full = getDay3Farewell(s, null);
+  replyMessage(replyToken, [full[1]]);
+  Utilities.sleep(1000);
+  pushMessages(userId, full.slice(2));
 }
 
 // ============================================================
