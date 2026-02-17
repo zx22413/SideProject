@@ -303,42 +303,28 @@ async function submitCooking() {
   showScreen('complete');
   elements.resultDish.textContent = result.dishName || '料理完成';
   
-  // 一律使用 GAS pushCookingComplete API 推送劇情（不依賴 sendMessages/webhook）
-  // 原因：isInClient 在部分環境為 false（外部瀏覽器、LINE In-App Browser），sendMessages 可能失敗或不可用
   const isInClient = !!liff.isInClient();
   if (!result.dishName) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'branch no dishName',data:{success:result.success,dishName:result.dishName},timestamp:Date.now(),sessionId:'debug-session'})}).catch(()=>{});
-    // #endregion
-    console.warn('submitCooking 未回傳 dishName:', result);
     showScreen('cooking');
     showCatDialogue('「料理結果無法辨識…請再選一次食材。」');
     elements.btnCook.disabled = false;
     elements.btnCook.textContent = '完成料理';
     return;
   }
-  try {
-    const pushUrl = `${CONFIG.GAS_API_URL}?action=pushCookingComplete&userId=${encodeURIComponent(state.userId)}&dishName=${encodeURIComponent(result.dishName)}`;
-    const pushRes = await fetch(pushUrl);
-    const pushData = await pushRes.json().catch(() => ({}));
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'pushCookingComplete',data:{success:pushData.success,dishName:result.dishName,error:pushData.error,isInClient},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix'})}).catch(()=>{});
-    // #endregion
-    if (!pushData.success) {
-      console.warn('pushCookingComplete 失敗:', pushData);
-      showCatDialogue('「推送劇情時發生問題…請稍後再試。」');
-      return;
+
+  if (isInClient) {
+    try {
+      await liff.sendMessages([{
+        type: 'text',
+        text: `【料理完成】${result.dishName}`
+      }]);
+    } catch (sendErr) {
+      console.warn('sendMessages 失敗，fallback 到 pushCookingComplete:', sendErr);
+      await callPushCookingComplete(result.dishName);
     }
-    if (!isInClient) {
-      showCatDialogue('「料理完成了。請回到 LINE 聊天室查看後續劇情。」');
-    }
-  } catch (pushErr) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/7958e808-d1c0-4bc6-b571-e1179ff951ff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app.js:submitCooking',message:'pushCookingComplete error',data:{error:String(pushErr)},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix'})}).catch(()=>{});
-    // #endregion
-    console.error('pushCookingComplete 請求失敗:', pushErr);
-    showCatDialogue('「無法連線…請確認網路後再試。」');
-    return;
+  } else {
+    await callPushCookingComplete(result.dishName);
+    showCatDialogue('「料理完成了。請回到 LINE 聊天室查看後續劇情。」');
   }
   
   // 關閉 LIFF（isInClient 時）或提示回到 LINE
@@ -350,6 +336,22 @@ async function submitCooking() {
       liff.closeWindow();
     }
   }, 2000);
+}
+
+async function callPushCookingComplete(dishName) {
+  try {
+    const pushUrl = `${CONFIG.GAS_API_URL}?action=pushCookingComplete&userId=${encodeURIComponent(state.userId)}&dishName=${encodeURIComponent(dishName)}`;
+    const pushRes = await fetch(pushUrl);
+    const pushData = await pushRes.json().catch(() => ({}));
+    if (!pushData.success) {
+      console.warn('pushCookingComplete 失敗:', pushData);
+      showCatDialogue('「推送劇情時發生問題…請稍後再試。」');
+    }
+    return pushData;
+  } catch (pushErr) {
+    console.error('pushCookingComplete 請求失敗:', pushErr);
+    showCatDialogue('「無法連線…請確認網路後再試。」');
+  }
 }
 
 // ============================================

@@ -149,6 +149,9 @@ const scriptProperties = PropertiesService.getScriptProperties();
 const SPREADSHEET_ID = scriptProperties.getProperty('SPREADSHEET_ID') || '';
 const LINE_TOKEN = scriptProperties.getProperty('LINE_CHANNEL_ACCESS_TOKEN') || '';
 
+// 除錯日誌寫入試算表用（與 userStateTanaka 同一個試算表）
+const DEBUG_LOG_SHEET_NAME = "agent_debug";
+
 // 非敏感配置（可以直接寫在程式碼中）
 const CONFIG = {
   LINE_CHANNEL_ACCESS_TOKEN: LINE_TOKEN,  // 從 Script Properties 讀取
@@ -161,6 +164,26 @@ const CONFIG = {
   LIFF_ID: '2009042883-1e0HSFLa',
   LIFF_URL: 'https://liff.line.me/2009042883-1e0HSFLa'
 };
+
+/**
+ * 將 [DAY1_DEBUG] 除錯日誌寫入試算表「agent_debug」，方便直接開 Sheet 查看。
+ * 若試算表不存在或寫入失敗則靜默略過，不影響主流程。
+ */
+function debugLogToSheet(location, message, data, hypothesisId) {
+  if (!SPREADSHEET_ID) return;
+  try {
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(DEBUG_LOG_SHEET_NAME);
+    if (!sheet) {
+      sheet = ss.insertSheet(DEBUG_LOG_SHEET_NAME);
+      sheet.appendRow(["時間", "location", "message", "data", "hypothesisId"]);
+    }
+    var dataStr = (data !== undefined && data !== null) ? JSON.stringify(data) : "";
+    sheet.appendRow([new Date().toISOString(), location, message, dataStr, hypothesisId || ""]);
+  } catch (e) {
+    Logger.log("debugLogToSheet 錯誤: " + e);
+  }
+}
 
 // 時段定義
 const PHASE = {
@@ -220,6 +243,13 @@ function doPost(e) {
     }
     
     const event = data.events[0];
+    // #region agent log - 記錄每筆 webhook 請求，確認「繼續」按下時收到的是 message 還是 postback
+    var evType = event.type || "";
+    var evPayload = "";
+    if (event.type === "message" && event.message) evPayload = (event.message.text || "").slice(0, 50);
+    if (event.type === "postback" && event.postback) evPayload = (event.postback.data || "").slice(0, 80);
+    debugLogToSheet("doPost:webhook", "event", { type: evType, payload: evPayload }, "H2");
+    // #endregion
     // ✨ 立即顯示 Loading Animation（在任何處理之前）（加入好友不顯示，保持歡迎體驗）
     if (event.type !== "follow" && event.source && event.source.userId) {
       showLoadingAnimation(event.source.userId, 10);
@@ -554,11 +584,17 @@ function handleLiffCookingCompleteMessage(event, userId, state, dishName) {
   if (day === 1) {
     if (dishName === "熱茶") {
       addTopic(userId, state, "cooking_tea_part1");
+      // #region agent log
+      debugLogToSheet("handleLiffCookingCompleteMessage:Day1熱茶(reply)", "after addTopic", { dishName: dishName, topicsDone: (state.topicsDone || []).slice(-5) }, "H3,H4");
+      // #endregion
       replyMessage(event.replyToken, getDay1CookingTea_Part1(state));
       return true;
     }
     if (dishName === "熱湯") {
       addTopic(userId, state, "cooking_soup_part1");
+      // #region agent log
+      debugLogToSheet("handleLiffCookingCompleteMessage:Day1熱湯(reply)", "after addTopic", { dishName: dishName, topicsDone: (state.topicsDone || []).slice(-5) }, "H3,H4");
+      // #endregion
       replyMessage(event.replyToken, getDay1CookingSoup_Part1(state));
       return true;
     }
@@ -586,7 +622,7 @@ function handleLiffCookingCompleteMessage(event, userId, state, dishName) {
       updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
       var blockIdS = getDay2AfterBlockId(state.dishesCooked || []);
       if (blockIdS && hasDialogueBlock(blockIdS)) addTopic(userId, state, blockIdS + "_1");
-      replyThenPushAfterDelay(event.replyToken, userId, getDay2CookingResult_撫慰_BeforeFlex(), getDay2CookingResult_撫慰_AfterFlex(), 1000);
+      replyMessage(event.replyToken, [].concat(getDay2CookingResult_撫慰_BeforeFlex()).concat(getDay2CookingResult_撫慰_AfterFlex()));
       return true;
     }
   }
@@ -613,14 +649,44 @@ function pushLiffCookingCompleteStoryline(userId, dishName) {
   showLoadingAnimation(userId, 5);
   if (day === 1) {
     if (dishName === "熱茶") {
-      addTopic(userId, state, "cooking_tea_part1");
-      pushMessages(userId, getDay1CookingTea_Part1(state));
-      return { success: true };
+      debugLogToSheet("pushLiffCookingCompleteStoryline", "Day1熱茶_start", { userId: userId, dishName: dishName }, "liff_push");
+      try {
+        addTopic(userId, state, "cooking_tea_part1");
+        addTopic(userId, getUserState(userId), "cooking_tea_part2");
+        addTopic(userId, getUserState(userId), "cooking_tea_part3");
+        addDishCooked(userId, getUserState(userId), "熱茶");
+        updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
+        pushMessages(userId, getDay1CookingTea_Part1(state));
+        pushMessages(userId, getDay1CookingTea_Part2());
+        pushMessages(userId, getDay1CookingTea_Part3());
+        Utilities.sleep(1000);
+        var part3After = getDay1CookingTea_Part3AfterFlex();
+        if (hasDialogueBlock(DIALOGUE_BLOCK_TRANSITION)) {
+          part3After = applyDialogueSeq1ToLastMessage(part3After);
+          addTopic(userId, getUserState(userId), "transition_expand_1");
+        }
+        pushMessages(userId, part3After);
+        debugLogToSheet("pushLiffCookingCompleteStoryline", "Day1熱茶_done", {}, "liff_push");
+        return { success: true };
+      } catch (err) {
+        debugLogToSheet("pushLiffCookingCompleteStoryline", "Day1熱茶_error", { error: String(err) }, "liff_push");
+        return { success: false, error: String(err) };
+      }
     }
     if (dishName === "熱湯") {
-      addTopic(userId, state, "cooking_soup_part1");
-      pushMessages(userId, getDay1CookingSoup_Part1(state));
-      return { success: true };
+      debugLogToSheet("pushLiffCookingCompleteStoryline", "Day1熱湯_start", { userId: userId, dishName: dishName }, "liff_push");
+      try {
+        addTopic(userId, state, "cooking_soup_part1");
+        addTopic(userId, getUserState(userId), "cooking_soup_part2");
+        updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
+        pushMessages(userId, getDay1CookingSoup_Part1(state));
+        pushMessages(userId, getDay1CookingSoup_Part2());
+        debugLogToSheet("pushLiffCookingCompleteStoryline", "Day1熱湯_done", {}, "liff_push");
+        return { success: true };
+      } catch (err) {
+        debugLogToSheet("pushLiffCookingCompleteStoryline", "Day1熱湯_error", { error: String(err) }, "liff_push");
+        return { success: false, error: String(err) };
+      }
     }
   }
   if (day === 2) {
@@ -746,6 +812,9 @@ function handleMessage(event) {
   if (userText.startsWith("【料理完成】")) {
     const dishName = userText.replace("【料理完成】", "").trim();
     Logger.log("【料理完成】 userId=" + userId + " dishName=" + dishName + " currentDay=" + (state ? state.currentDay : "null") + " handled=" + (dishName && state ? "pending" : "skip"));
+    // #region agent log
+    if (state) debugLogToSheet("handleMessage:料理完成", "entry", { dishName: dishName, currentDay: state.currentDay, phase: state.phase, topicsDone: (state.topicsDone || []).slice(-5) }, "H3,H4");
+    // #endregion
     if (dishName && state) {
       const handled = handleLiffCookingCompleteMessage(event, userId, state, dishName);
       Logger.log("【料理完成】 handleLiffCookingCompleteMessage returned handled=" + handled);
@@ -920,6 +989,9 @@ function routeByPhase(event, userId, state, userText) {
   
   // Day 1 路由
   if (day === 1) {
+    // #region agent log
+    debugLogToSheet("routeByPhase:Day1", "routing", { phase: phase, userText: userText.slice(0, 20), topicsDoneLen: (state.topicsDone || []).length }, "H2");
+    // #endregion
     if (phase === PHASE.NIGHT) {
       handleDay1Night(event, userId, state, userText);
     } else if (phase === PHASE.DAY) {
@@ -982,6 +1054,31 @@ function handlePostback(event) {
   if (data === "flow=day1_show_topic") {
     var s = getUserState(userId);
     replyMessage(event.replyToken, getDay1DayShift(s));
+    return;
+  }
+  // 你的手 Part1→Part2 記憶劇場（postback 備援：部分環境 message 型 quickReply 不觸發 webhook）
+  if (data === "flow=day1_hands_part2") {
+    debugLogToSheet("handlePostback:day1_hands_part2", "entry", { userId: userId }, "hands_part2");
+    try {
+      var s = getUserState(userId);
+      if (s && (s.topicsDone || []).includes("hands_part1") && !(s.topicsDone || []).includes("hands_part2")) {
+        addMemory(userId, s, "針");
+        addMemory(userId, getUserState(userId), "縫線");
+        addMemory(userId, getUserState(userId), "寒冷");
+        addMemory(userId, getUserState(userId), "裁縫手藝");
+        addTopic(userId, getUserState(userId), "hands_part2");
+        var updatedState = getUserState(userId);
+        var part2Messages = getDay1TopicHandsMessages_Part2_NoQuickReply();
+        var firstBatch = [part2Messages[0], part2Messages[1]];
+        var secondBatch = [part2Messages[2], part2Messages[3], getDay1DecideMessage(updatedState)];
+        replyMessage(event.replyToken, firstBatch.concat(secondBatch));
+        debugLogToSheet("handlePostback:day1_hands_part2", "after_reply", { firstBatchLen: firstBatch.length }, "hands_part2");
+      } else {
+        debugLogToSheet("handlePostback:day1_hands_part2", "skip_condition", { hasPart1: !!(s && (s.topicsDone || []).includes("hands_part1")), hasPart2: !!(s && (s.topicsDone || []).includes("hands_part2")) }, "hands_part2");
+      }
+    } catch (err) {
+      debugLogToSheet("handlePostback:day1_hands_part2", "error", { error: String(err) }, "hands_part2");
+    }
     return;
   }
   if (data === "flow=day2_day_shift") {
@@ -1736,13 +1833,21 @@ function pushMessages(userId, messages) {
   const options = {
     method: "post",
     headers: headers,
-    payload: JSON.stringify(payload)
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
   };
   
   try {
-    UrlFetchApp.fetch(url, options);
+    var response = UrlFetchApp.fetch(url, options);
+    var code = response.getResponseCode();
+    if (code !== 200) {
+      var body = response.getContentText();
+      Logger.log("Push 訊息失敗 code=" + code + " body=" + body.slice(0, 300));
+      debugLogToSheet("pushMessages", "push_failed", { code: code, body: body.slice(0, 500), userId: userId }, "push");
+    }
   } catch (error) {
     Logger.log("Push 訊息失敗: " + error);
+    debugLogToSheet("pushMessages", "push_exception", { error: String(error), userId: userId }, "push");
   }
 }
 
@@ -2346,7 +2451,7 @@ function handleDay1Day(event, userId, state, userText) {
     var part2Messages = getDay1TopicHandsMessages_Part2_NoQuickReply();
     var firstBatch = [part2Messages[0], part2Messages[1]];
     var secondBatch = [part2Messages[2], part2Messages[3], getDay1DecideMessage(updatedState)];
-    replyThenPushAfterDelay(event.replyToken, userId, firstBatch, secondBatch, 1000);
+    replyMessage(event.replyToken, firstBatch.concat(secondBatch));
     return;
   }
   
@@ -2543,7 +2648,7 @@ function getDay1TopicHandsMessages_Part1() {
       quickReply: {
         items: [{
           type: "action",
-          action: { type: "message", label: "繼續聽", text: "【繼續】" }
+          action: { type: "postback", label: "繼續聽", data: "flow=day1_hands_part2" }
         }]
       }
     }
@@ -2694,7 +2799,10 @@ function getTopicSilenceResponse() {
 // ============================================================
 function handleDay1Cooking(event, userId, state, userText) {
   const topicsDone = state.topicsDone || [];
-  
+  // #region agent log
+  debugLogToSheet("handleDay1Cooking", "entry", { userText: userText.slice(0, 30), topicsDone: topicsDone.slice(-8), hasTeaPart1: topicsDone.includes("cooking_tea_part1"), hasSoupPart1: topicsDone.includes("cooking_soup_part1") }, "H1");
+  // #endregion
+
   // ⚠️ 安全檢查：如果用戶輸入的是話題選擇，將 phase 重置為 DAY 並處理
   // 這可以防止因競爭條件導致的 phase 錯誤
   const topicInputs = [
@@ -2743,6 +2851,9 @@ function handleDay1Cooking(event, userId, state, userText) {
   }
   // 處理【繼續】→ Part 2
   else if (userText === "【繼續】" && topicsDone.includes("cooking_tea_part1") && !topicsDone.includes("cooking_tea_part2")) {
+    // #region agent log
+    debugLogToSheet("handleDay1Cooking", "branch part1->part2 熱茶", {}, "H1");
+    // #endregion
     showLoadingAnimation(userId, 5);
     addTopic(userId, state, "cooking_tea_part2");
     replyMessage(event.replyToken, getDay1CookingTea_Part2());
@@ -2759,7 +2870,7 @@ function handleDay1Cooking(event, userId, state, userText) {
       part3After = applyDialogueSeq1ToLastMessage(part3After);
       addTopic(userId, getUserState(userId), "transition_expand_1");
     }
-    replyThenPushAfterDelay(event.replyToken, userId, getDay1CookingTea_Part3(), part3After, 1000);
+    replyMessage(event.replyToken, [].concat(getDay1CookingTea_Part3()).concat(part3After));
     return;
   }
   else if (userText === "做熱湯" || userText === "【做熱湯】" || userText.includes("熱湯")) {
@@ -2788,6 +2899,9 @@ function handleDay1Cooking(event, userId, state, userText) {
   }
   // 處理【繼續】→ Part 2（先送文字 + quickReply「繼續」，postback 再送記憶劇場）
   else if (userText === "【繼續】" && topicsDone.includes("cooking_soup_part1") && !topicsDone.includes("cooking_soup_part2")) {
+    // #region agent log
+    debugLogToSheet("handleDay1Cooking", "branch part1->part2 熱湯", {}, "H1");
+    // #endregion
     showLoadingAnimation(userId, 5);
     addTopic(userId, state, "cooking_soup_part2");
     updateUserState(userId, {
@@ -2798,6 +2912,9 @@ function handleDay1Cooking(event, userId, state, userText) {
     return;
   } 
   else {
+    // #region agent log
+    debugLogToSheet("handleDay1Cooking", "branch default 廚房場景", { userText: userText.slice(0, 30) }, "H1");
+    // #endregion
     // 預設回應 - 直接顯示廚房場景（不使用 quickReply，避免與雙選項衝突）
     showLoadingAnimation(userId, 5);
     replyMessage(event.replyToken, [
@@ -2969,7 +3086,10 @@ function getDay1CookingScene(state) {
 // ============================================================
 function handleDay1After(event, userId, state, userText) {
   const topicsDone = state ? (state.topicsDone || []) : [];
-  
+  // #region agent log
+  debugLogToSheet("handleDay1After", "entry", { userText: userText.slice(0, 30), topicsDone: topicsDone.slice(-8) }, "H2");
+  // #endregion
+
   // LIFF 料理完成後 phase 已為 AFTER，【繼續】須在此處理（與 handleDay1Cooking 邏輯對齊）
   if (userText === "【繼續】" && topicsDone.includes("cooking_tea_part1") && !topicsDone.includes("cooking_tea_part2")) {
     showLoadingAnimation(userId, 5);
@@ -2987,7 +3107,7 @@ function handleDay1After(event, userId, state, userText) {
       part3After = applyDialogueSeq1ToLastMessage(part3After);
       addTopic(userId, getUserState(userId), "transition_expand_1");
     }
-    replyThenPushAfterDelay(event.replyToken, userId, getDay1CookingTea_Part3(), part3After, 1000);
+    replyMessage(event.replyToken, [].concat(getDay1CookingTea_Part3()).concat(part3After));
     return;
   }
   if (userText === "【繼續】" && topicsDone.includes("cooking_soup_part1") && !topicsDone.includes("cooking_soup_part2")) {
@@ -3871,7 +3991,7 @@ function handleDay2Day(event, userId, state, userText) {
     addMemory(userId, state, "女兒-美雪");
     addMemory(userId, state, "婚紗");
     var part2 = getDay2TopicDreamMessages_Part2();
-    replyThenPushSequence(event.replyToken, userId, [[part2[0]], [part2[1]], [part2[2]], [part2[3]], [part2[4]]], 2000);
+    replyMessage(event.replyToken, [part2[0], part2[1], part2[2], part2[3], part2[4]]);
     return;
   }
   
@@ -4729,7 +4849,7 @@ function handleDay2Cooking(event, userId, state, userText) {
     updateUserState(userId, { phase: PHASE.AFTER, lastActive: new Date().toISOString() });
     var blockIdSalt = getDay2AfterBlockId(state.dishesCooked || []);
     if (blockIdSalt && hasDialogueBlock(blockIdSalt)) addTopic(userId, state, blockIdSalt + "_1");
-    replyThenPushAfterDelay(event.replyToken, userId, getDay2CookingResult_撫慰_BeforeFlex(), getDay2CookingResult_撫慰_AfterFlex(), 1000);
+    replyMessage(event.replyToken, [].concat(getDay2CookingResult_撫慰_BeforeFlex()).concat(getDay2CookingResult_撫慰_AfterFlex()));
     return;
   } else {
     // 預設回應 - 顯示廚房場景
@@ -5682,11 +5802,9 @@ function handleDay3Cooking(event, userId, state, userText) {
       lastActive: new Date().toISOString()
     });
     var updatedState = getUserState(userId);
-    replyMessage(event.replyToken, getDay3Ending(updatedState));
-    Utilities.sleep(1000);
-    pushMessages(userId, [getDay3EndingFlexCardPart1(updatedState)]);
-    Utilities.sleep(1000);
-    pushMessages(userId, [getDay3EndingFlexCardPart2(updatedState)]);
+    var endingMsgs = getDay3Ending(updatedState);
+    if (CONFIG.DEBUG_MODE) Logger.log("getDay3Ending 回傳則數: " + (Array.isArray(endingMsgs) ? endingMsgs.length : 1));
+    replyMessage(event.replyToken, [].concat(endingMsgs).concat([getDay3EndingFlexCardPart1(updatedState)]).concat([getDay3EndingFlexCardPart2(updatedState)]));
     return;
   } 
   else {
@@ -6463,9 +6581,7 @@ function getDay3FarewellOpening(state, userId) {
 function handleFarewellHeirloomAndSurvey(replyToken, userId, state) {
   var s = getUserState(userId) || state;
   var full = getDay3Farewell(s, null);
-  replyMessage(replyToken, [full[1]]);
-  Utilities.sleep(1000);
-  pushMessages(userId, full.slice(2));
+  replyMessage(replyToken, [full[1]].concat(full.slice(2)));
 }
 
 // ============================================================
@@ -7155,8 +7271,8 @@ function handleOpenBio(event, userId, state) {
     return;
   }
   
-  // 允許查看：用 push 發送（Loading 動畫後 reply token 可能失效，改用 push 確保有回應）
-  pushMessages(userId, handleBiographyRequestWithReturn(state));
+  // 允許查看：reply token 在此處仍有效，改用 reply 節省 Push 額度
+  replyMessage(event.replyToken, handleBiographyRequestWithReturn(state));
 }
 
 /**
@@ -7181,8 +7297,8 @@ function handleOpenHeirloom(event, userId, state) {
     return;
   }
   
-  // 允許查看：用 push 發送（Loading 動畫後 reply token 可能失效，改用 push 確保有回應）
-  pushMessages(userId, handleHeirloomRequestWithReturn(state));
+  // 允許查看：reply token 在此處仍有效，改用 reply 節省 Push 額度
+  replyMessage(event.replyToken, handleHeirloomRequestWithReturn(state));
 }
 
 /**
