@@ -540,18 +540,15 @@ VAR deepest_topic_day2 = "" // "childhood" / "last_stitch" / "ceremony" / ""
 
 今天能做的料理：
 
-{ done_hands || done_origin || done_rain:
-    * { done_hands } [🍵 熱茶——用針線與寒冷的記憶]
-        -> COOK_TEA
-}
-{ done_origin || done_rain:
-    * [🍲 熱湯——用雨聲與迷茫的記憶]
-        -> COOK_SOUP
-}
 { not done_hands and not done_origin and not done_rain:
     // 沒有任何食材
     【黑貓】「...還缺食材。再聊聊。」
     -> DAY1_DAY
+- else:
+    * { done_hands } [🍵 熱茶——用針線與寒冷的記憶]
+        -> COOK_TEA
+    * { done_origin || done_rain } [🍲 熱湯——用雨聲與迷茫的記憶]
+        -> COOK_SOUP
 }
 
 
@@ -1169,6 +1166,7 @@ VAR deepest_topic_day2 = "" // "childhood" / "last_stitch" / "ceremony" / ""
 
 今天能做的料理：
 
+-
 * { done_dream && flavor_sweet >= 2 } [🍯 蜜汁燉菜——蜜糖笑容與眼淚]
     -> COOK_HONEY
 * { done_seeking && done_death } [☕ 苦辛醒神湯——執念與雪]
@@ -2246,7 +2244,7 @@ VAR deepest_topic_day2 = "" // "childhood" / "last_stitch" / "ceremony" / ""
 }
 { ending_type == "BALANCED":
     一枚銀頂針。
-    小小的，磨得發亮。裡面刻著兩個字——「雪子」。
+    小小的，磨得發亮。裡面刻著兩個字——「美雪」。
     { has_ceremony:
         頂針旁邊還有一粒紐扣。骨質的，縫線整齊——和他大衣上的一模一樣。
     }
