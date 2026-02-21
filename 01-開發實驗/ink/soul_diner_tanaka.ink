@@ -323,6 +323,10 @@ VAR has_obsession = false      // 執念（DEATH L3 失敗）
 
 = DAY1_TOPIC_MENU
 
+{ day1_topics_done > 0:
+    〔目前五味｜甜:{flavor_sweet} 苦:{flavor_bitter} 鹹:{flavor_salty} 酸:{flavor_sour} 辣:{flavor_spicy}〕
+}
+
 // 硬性上限：Day1 最多聊 2 個主話題
 { day1_topics_done >= 2:
     老人的眼皮漸漸沉重。他的手從桌面滑落，像是被抽乾了力氣。
@@ -1126,6 +1130,10 @@ VAR has_obsession = false      // 執念（DEATH L3 失敗）
 -> DAY2_TOPIC_MENU
 
 = DAY2_TOPIC_MENU
+
+{ day2_topics_done > 0:
+    〔目前五味｜甜:{flavor_sweet} 苦:{flavor_bitter} 鹹:{flavor_salty} 酸:{flavor_sour} 辣:{flavor_spicy}〕
+}
 
 // 硬性上限：Day2 最多聊 2 個主話題
 { day2_topics_done >= 2:
