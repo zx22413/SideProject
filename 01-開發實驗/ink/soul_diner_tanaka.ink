@@ -2481,7 +2481,99 @@ VAR has_obsession = false      // 執念（DEATH L3 失敗）
 
 〔目前五味｜甜:{flavor_sweet} 苦:{flavor_bitter} 鹹:{flavor_salty} 酸:{flavor_sour} 辣:{flavor_spicy}〕
 
-// 計算結局類型
+【黑貓坐在料理台上】「最後一次了。」
+
+你把所有記憶食材放進去。
+
+料理做好了。
+
+你端著它走向田中。
+
+━━━━━━━━━━━━━━━
+
+他吃了一口。
+
+沉默了很久。
+
+窗外那個接近光的東西，好像更近了一點。
+
+他抬起頭，看著你。眼神很清醒——清醒得讓你有點不安。
+
+「那件婚紗...」
+
+「我縫完了嗎？」
+
+// ---- 最後判斷：玩家從自己走過的路裡選一個畫面 ----
+
+你沒有馬上回答。
+
+腦子裡，有什麼東西浮上來。
+
+-
+{ done_last_stitch:
+    * [他說「我縫完了」的聲音。]
+        很輕。像是說給自己聽的。
+        你在場。你聽見了。
+        你點了點頭。
+        「縫完了。」
+        他閉上眼睛。
+        「...是嗎。」
+        沉默了很久。
+        「那就好。」
+        ~ flavor_sweet = flavor_sweet + 2
+        -> DAY3_COOK
+}
+{ has_miyuki_smile:
+    * [他說美雪笑起來像蜜糖的那句話。]
+        說完之後他沉默了很久。嘴角是軟的。
+        你想起那句話，然後開口。
+        「她記得你的。」
+        他的手停了一下。
+        「...你怎麼知道？」
+        「我不知道。但我感覺得到。」
+        他沒有再問。
+        ~ flavor_sweet = flavor_sweet + 2
+        -> DAY3_COOK
+}
+{ done_silence:
+    * [那個安靜的下午，你坐在他旁邊什麼都沒說。]
+        他後來說，那是三天裡最舒服的時刻。
+        你想起那個下午，沒有開口。
+        你走過去，在他旁邊坐下。
+        就這樣。
+        他看著你，過了很久，輕輕點了點頭。
+        「...嗯。」
+        ~ flavor_salty = flavor_salty + 2
+        -> DAY3_COOK
+}
+{ done_seeking:
+    * [他那雙在空氣中縫紉的手。]
+        手記得。身體記得。只有腦袋不記得。
+        你看著他的手，然後說：
+        「你的手知道答案。」
+        他低頭看了看自己的手指。
+        久久沒有說話。
+        「...對。」
+        「我的手知道。」
+        ~ flavor_bitter = flavor_bitter + 2
+        -> DAY3_COOK
+}
+{ not done_last_stitch && not has_miyuki_smile && not done_silence && not done_seeking:
+    * [這三天，他的樣子。]
+        你說不清楚是哪一個瞬間——
+        但有什麼東西，確確實實留下來了。
+        你開口，說了一句說不清楚從哪裡來的話：
+        「你做了你能做的。」
+        他沉默了很久。
+        「...也許吧。」
+        ~ flavor_salty = flavor_salty + 2
+        -> DAY3_COOK
+}
+
+
+=== DAY3_COOK ===
+
+// 計算結局類型（在玩家最後判斷五味偏移之後）
 { flavor_sweet > (flavor_bitter + flavor_sour + flavor_spicy + flavor_salty):
     ~ ending_type = "SWEET"
 }
@@ -2492,7 +2584,7 @@ VAR has_obsession = false      // 執念（DEATH L3 失敗）
     ~ ending_type = "BALANCED"
 }
 
-// 計算 Day 3 料理
+// 計算 Day3 料理
 {
     - ending_type == "SWEET":
         ~ day3_dish = "糖霜幻景拼盤"
@@ -2501,30 +2593,6 @@ VAR has_obsession = false      // 執念（DEATH L3 失敗）
     - else:
         ~ day3_dish = "百味蜜汁炙燒魚"
 }
-
-【黑貓坐在料理台上】「最後一次了。」
-
-{ ending_type == "SWEET":
-    「把所有甜的都拼在一起...再撒上糖粉...這是要騙誰呢？」
-}
-{ ending_type == "BITTER":
-    「只剩骨頭了...肉都沒了。這就是現實的滋味嗎？」
-}
-{ ending_type == "BALANCED":
-    「甜的、鹹的、苦的、酸的...全都有。這才像個人生嘛。」
-}
-
-* [投入所有記憶]
-    -> DAY3_COOK
-* [猶豫了一下]
-    你的手停在鍋子上方。所有的記憶都在這裡了——笑容、眼淚、針、雪。
-    【黑貓】「...怎麼了？」
-    「沒事。」
-    你把手放了下去。
-    -> DAY3_COOK
-
-
-=== DAY3_COOK ===
 
 // 依結局類型分流；else 防呆（正常流程必已設定 ending_type）
 {
