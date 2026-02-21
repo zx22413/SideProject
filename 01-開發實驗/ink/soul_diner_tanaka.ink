@@ -812,6 +812,9 @@ VAR has_obsession = false      // 執念（DEATH L3 失敗）
 
 ━━━━━━━━━━━━━━━
 
+〔獲得五味｜甜 +2〕
+〔目前五味｜甜:{flavor_sweet} 苦:{flavor_bitter} 鹹:{flavor_salty} 酸:{flavor_sour} 辣:{flavor_spicy}〕
+
 【老人睜開眼，眼中有淚光】
 
 「有個人...曾經給我泡過茶。」
@@ -884,6 +887,9 @@ VAR has_obsession = false      // 執念（DEATH L3 失敗）
 「是苦的。但...很清醒。」
 
 沉默。
+
+〔獲得五味｜苦 +2〕
+〔目前五味｜甜:{flavor_sweet} 苦:{flavor_bitter} 鹹:{flavor_salty} 酸:{flavor_sour} 辣:{flavor_spicy}〕
 
 【老人的眼神變得恍惚】
 
@@ -1518,8 +1524,6 @@ VAR has_obsession = false      // 執念（DEATH L3 失敗）
     【黑貓】「就這樣？確定了？」
 }
 
-〔目前五味｜甜:{flavor_sweet} 苦:{flavor_bitter} 鹹:{flavor_salty} 酸:{flavor_sour} 辣:{flavor_spicy}〕
-
 * [嗯，去廚房]
     -> DAY2_COOKING
 * [再聊一下]
@@ -1539,6 +1543,8 @@ VAR has_obsession = false      // 執念（DEATH L3 失敗）
 🍳 Cooking Time 18:00
 
 ━━━━━━━━━━━━━━━
+
+〔目前五味｜甜:{flavor_sweet} 苦:{flavor_bitter} 鹹:{flavor_salty} 酸:{flavor_sour} 辣:{flavor_spicy}〕
 
 【黑貓蹲在櫃子上】
 
